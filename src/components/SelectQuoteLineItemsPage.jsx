@@ -228,8 +228,33 @@ export default function SelectQuoteLineItemsPage({ onBack, quote1Locations = [],
   const [bcpCity, setBcpCity] = useState('')
   const [bcpState, setBcpState] = useState('')
   const [bcpCountry, setBcpCountry] = useState('')
+  const [bcpGstApplicable, setBcpGstApplicable] = useState('')
+  const [bcpStandardReason, setBcpStandardReason] = useState('')
+  const [bcpGstAdded, setBcpGstAdded] = useState(false)
+  const [bcpGstNumber, setBcpGstNumber] = useState('')
+  const [bcpEndDate, setBcpEndDate] = useState('')
+  const [bcpGstValidated, setBcpGstValidated] = useState(false)
+  const [validateGstModalOpen, setValidateGstModalOpen] = useState(false)
   const [addBcpValidationErrors, setAddBcpValidationErrors] = useState({})
   const BCP_SALUTATIONS = ['Mr.', 'Mrs.', 'Ms.', 'Dr.', 'Prof.']
+  const BCP_STANDARD_REASONS = [
+    'SEZ',
+    'UIN',
+    'Exempt',
+    'Non-SEZ',
+    'Applied For',
+    'SEZ with Taxes',
+    'Zero Rated Supply- FTWZ',
+    'Zero Rated Supply- Export',
+    'Non Taxable as transactions within same Company',
+    'Airtel- Foreign Legal Entity',
+    'Others',
+    'Exempt-Trust/Entities 12AA',
+    'Zero Rated Supply- SEZ',
+    'J&K delivery - Out of GST Preview',
+    'Exempt Supply - Trust/Entities 12AA',
+    'Tax Deductor',
+  ]
   const [existingInvoiceModalRow, setExistingInvoiceModalRow] = useState(null)
   const [existingInvoiceModalBulkIds, setExistingInvoiceModalBulkIds] = useState(null)
   const [applyNewInvoiceToSelectedIds, setApplyNewInvoiceToSelectedIds] = useState(true)
@@ -490,7 +515,14 @@ export default function SelectQuoteLineItemsPage({ onBack, quote1Locations = [],
   }, [isInvoiceShippingSingleRowEdit])
 
   useEffect(() => {
-    if (addBcpModalOpen) setAddBcpValidationErrors({})
+    if (addBcpModalOpen) {
+      setAddBcpValidationErrors({})
+      setBcpGstAdded(false)
+      setBcpGstNumber('')
+      setBcpEndDate('')
+      setBcpGstValidated(false)
+      setValidateGstModalOpen(false)
+    }
   }, [addBcpModalOpen])
 
   useEffect(() => {
@@ -1960,7 +1992,7 @@ export default function SelectQuoteLineItemsPage({ onBack, quote1Locations = [],
                 <label className="block text-gray-700 mb-1">Fax</label>
                 <input type="text" value={bcpFax} onChange={(e) => setBcpFax(e.target.value)} className="w-full px-2 py-1.5 border border-gray-300 rounded" placeholder="Fax" />
               </div>
-              <div className="col-span-3">
+              <div>
                 <label className="block text-gray-700 mb-1">Pin code <span className="text-red-500">*</span></label>
                 <input type="text" value={bcpPincode} onChange={(e) => { setBcpPincode(e.target.value); const v = e.target.value; if (v === '452002') { setBcpCity('Indore'); setBcpState('Madhya Pradesh'); setBcpCountry('India'); } else if (v === '110001') { setBcpCity('New Delhi'); setBcpState('Delhi'); setBcpCountry('India'); } }} className="w-full px-2 py-1.5 border border-gray-300 rounded" placeholder="e.g. 452002 - Indore" />
               </div>
@@ -1983,6 +2015,68 @@ export default function SelectQuoteLineItemsPage({ onBack, quote1Locations = [],
                 <input type="text" value={bcpCountry} onChange={(e) => { setBcpCountry(e.target.value); setAddBcpValidationErrors((prev) => ({ ...prev, country: false })) }} className={`w-full px-2 py-1.5 border rounded ${addBcpValidationErrors.country ? 'border-red-500' : 'border-gray-300'}`} placeholder="e.g. India" />
                 {addBcpValidationErrors.country && <p className="text-red-500 text-[10px] mt-0.5">Required</p>}
               </div>
+              <div>
+                <label className="block text-gray-700 mb-1">GST Applicable <span className="text-red-500">*</span></label>
+                <input type="text" value={bcpGstApplicable} onChange={(e) => { setBcpGstApplicable(e.target.value); setAddBcpValidationErrors((prev) => ({ ...prev, gstApplicable: false })) }} className={`w-full px-2 py-1.5 border rounded ${addBcpValidationErrors.gstApplicable ? 'border-red-500' : 'border-gray-300'}`} placeholder="GST Applicable" />
+                {addBcpValidationErrors.gstApplicable && <p className="text-red-500 text-[10px] mt-0.5">Required</p>}
+              </div>
+              <div>
+                <label className="block text-gray-700 mb-1">Standard Reason</label>
+                <select value={bcpStandardReason} onChange={(e) => setBcpStandardReason(e.target.value)} className="w-full px-2 py-1.5 border border-gray-300 rounded">
+                  <option value="">Select...</option>
+                  {BCP_STANDARD_REASONS.map((r) => (<option key={r} value={r}>{r}</option>))}
+                </select>
+              </div>
+              <div className="flex items-end">
+                <button
+                  type="button"
+                  onClick={() => setBcpGstAdded(true)}
+                  disabled={bcpGstAdded}
+                  className="px-3 py-1.5 rounded bg-airtel-red text-white text-xs font-medium hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-airtel-red"
+                >
+                  Add GST
+                </button>
+              </div>
+              {bcpGstAdded && (
+                <>
+                  <div className="col-span-3 border-t border-gray-200 my-2 pt-3" />
+                  <div>
+                    <label className="block text-gray-700 mb-1">GST Number <span className="text-red-500">*</span></label>
+                    <input
+                      type="text"
+                      value={bcpGstNumber}
+                      onChange={(e) => { setBcpGstNumber(e.target.value); setAddBcpValidationErrors((prev) => ({ ...prev, gstNumber: false })) }}
+                      className={`w-full px-2 py-1.5 border rounded ${addBcpValidationErrors.gstNumber ? 'border-red-500' : 'border-gray-300'}`}
+                      placeholder="GST Number"
+                    />
+                    {addBcpValidationErrors.gstNumber && <p className="text-red-500 text-[10px] mt-0.5">Required</p>}
+                  </div>
+                  <div>
+                    <label className="block text-gray-700 mb-1">End Date</label>
+                    <input
+                      type="date"
+                      value={bcpEndDate}
+                      onChange={(e) => setBcpEndDate(e.target.value)}
+                      className="w-full px-2 py-1.5 border border-gray-300 rounded"
+                    />
+                  </div>
+                  <div className="flex items-end">
+                    <button
+                      type="button"
+                      onClick={() => setValidateGstModalOpen(true)}
+                      disabled={bcpGstValidated}
+                      className="px-3 py-1.5 rounded bg-airtel-red text-white text-xs font-medium hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-airtel-red"
+                    >
+                      Validate GST
+                    </button>
+                  </div>
+                  {bcpGstValidated && (
+                    <div className="col-span-3 text-sm text-green-600">
+                      GST number {bcpGstNumber || ''} is validated
+                    </div>
+                  )}
+                </>
+              )}
             </div>
             {addBcpModalOpen && selectedIds.size >= 2 && (
               <div className="px-4 py-2 border-t border-gray-100">
@@ -2006,6 +2100,8 @@ export default function SelectQuoteLineItemsPage({ onBack, quote1Locations = [],
                   if (!(bcpCity || '').trim()) errors.city = true
                   if (!(bcpState || '').trim()) errors.state = true
                   if (!(bcpCountry || '').trim()) errors.country = true
+                  if (!(bcpGstApplicable || '').trim()) errors.gstApplicable = true
+                  if (bcpGstAdded && !(bcpGstNumber || '').trim()) errors.gstNumber = true
                   setAddBcpValidationErrors(errors)
                   if (Object.keys(errors).length > 0) return
                   const name = [bcpSalutation, bcpFirstName, bcpLastName].filter(Boolean).join(' ').trim()
@@ -2028,6 +2124,55 @@ export default function SelectQuoteLineItemsPage({ onBack, quote1Locations = [],
                 className="px-3 py-1.5 rounded bg-airtel-red text-white text-xs font-medium"
               >
                 Save
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Validate GST confirmation modal */}
+      {validateGstModalOpen && (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/40"
+          aria-modal="true"
+          role="dialog"
+          onClick={(e) => { if (e.target === e.currentTarget) setValidateGstModalOpen(false) }}
+        >
+          <div className="bg-white rounded-xl border border-gray-200 shadow-xl max-w-md w-full overflow-hidden" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200">
+              <span className="w-8 shrink-0" aria-hidden="true" />
+              <h2 className="flex-1 text-base font-bold text-[#032d60] text-center">Validate GST</h2>
+              <button
+                type="button"
+                onClick={() => setValidateGstModalOpen(false)}
+                className="w-8 h-8 shrink-0 p-1.5 rounded-lg text-gray-500 hover:bg-gray-100 focus:outline-none flex items-center justify-center"
+                aria-label="Close"
+              >
+                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                </svg>
+              </button>
+            </div>
+            <p className="px-5 py-4 text-sm text-gray-700 leading-relaxed">
+              Are you sure you want to proceed with GST number - {bcpGstNumber || '(number)'}?
+            </p>
+            <div className="border-t border-gray-200 px-5 py-4 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setValidateGstModalOpen(false)}
+                className="px-4 py-2 text-sm font-medium rounded-lg border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-300 focus:ring-offset-1"
+              >
+                Previous
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setValidateGstModalOpen(false)
+                  setBcpGstValidated(true)
+                }}
+                className="px-4 py-2 text-sm font-medium rounded-lg bg-airtel-red text-white hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-airtel-red focus:ring-offset-1"
+              >
+                Confirm
               </button>
             </div>
           </div>

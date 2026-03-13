@@ -189,6 +189,13 @@ function formatAttributesFromObject(obj, requestedProduct) {
   return values.join(', ')
 }
 
+// Return the "other" technology (Copper <-> Fiber) for MACD New Media column.
+function getDifferentTechnology(technology) {
+  if (technology === 'Copper') return 'Fiber'
+  if (technology === 'Fiber') return 'Copper'
+  return pick(OTHER_FIELDS.technology)
+}
+
 // Return attribute values different from oldAttributes (for MACD New Attributes column).
 // Deterministic: same (oldAttributes, requestedProduct) always yields same result, so values don't fluctuate on re-render.
 function getDifferentAttributesForProduct(oldAttributes, requestedProduct) {
@@ -464,6 +471,7 @@ function DataTableSection({
   const bulkEditRequestedProductsRef = useRef(null)
   const bulkEditMatchedProductsRef = useRef(null)
   const bulkEditTechnologyRef = useRef(null)
+  const bulkEditNewTechnologyRef = useRef(null)
   const menuAnchorRef = useRef(null)
   const viewByAnchorRef = useRef(null)
   const filterByAnchorRef = useRef(null)
@@ -471,6 +479,7 @@ function DataTableSection({
   const selectAllCheckboxRef = useRef(null)
   const validationRowsRef = useRef([])
   const macdNewAttributesCache = useRef({}) // Persist newAttributes per row so they don't fluctuate on re-render
+  const macdNewTechnologyCache = useRef({}) // Persist newTechnology per row for MACD New Media column
 
   const dataRows = ALL_ROWS.filter(
     (r) => !deletedIds.has(r.id) && !(continuedRecordIds && continuedRecordIds.has(r.id))
@@ -489,6 +498,13 @@ function DataTableSection({
           macdNewAttributesCache.current[cacheKey] = getDifferentAttributesForProduct(merged.attributes, merged.requestedProducts)
         }
         merged.newAttributes = macdNewAttributesCache.current[cacheKey]
+      }
+      if (!merged.newTechnology || merged.newTechnology === '') {
+        const cacheKey = `${row.id}`
+        if (!macdNewTechnologyCache.current[cacheKey]) {
+          macdNewTechnologyCache.current[cacheKey] = getDifferentTechnology(merged.technology)
+        }
+        merged.newTechnology = macdNewTechnologyCache.current[cacheKey]
       }
     }
     return merged
@@ -650,7 +666,7 @@ function DataTableSection({
   })()
 
   // When grouped by Media or Requested Products (and not sorting by Confidence), insert section header rows
-  const TABLE_COLUMN_COUNT = isMacdQuote ? 13 : 10
+  const TABLE_COLUMN_COUNT = isMacdQuote ? 14 : 10
   const effectiveColumnCount = TABLE_COLUMN_COUNT
   const tbodyItems = (() => {
     if (viewByValue === 'All' || confidenceSortDirection != null) return visibleRows.map((row) => ({ type: 'row', row }))
@@ -731,7 +747,9 @@ function DataTableSection({
     return () => cancelAnimationFrame(tick)
   }, [editingCell?.rowId, editingCell?.column, selectedRowIds.size])
 
-  const isBulkEditColumn = ['requestedProducts', 'matchedProducts', 'technology'].includes(editingCell?.column)
+  const isBulkEditColumn = isMacdQuote
+    ? ['requestedProducts', 'matchedProducts', 'newTechnology'].includes(editingCell?.column)
+    : ['requestedProducts', 'matchedProducts', 'technology'].includes(editingCell?.column)
   const isBulkEditActive = isBulkEditColumn && selectedRowIds.size >= 2
   useEffect(() => {
     if (!isBulkEditActive) {
@@ -1105,7 +1123,7 @@ function DataTableSection({
               zIndex: 9999,
             }}
             role="dialog"
-            aria-label={`Bulk edit ${editingCell.column === 'requestedProducts' ? 'Requested Products' : editingCell.column === 'matchedProducts' ? 'Matched Products' : 'Media'}`}
+            aria-label={`Bulk edit ${editingCell.column === 'requestedProducts' ? 'Requested Products' : editingCell.column === 'matchedProducts' ? 'Matched Products' : editingCell.column === 'newTechnology' ? 'New Media' : 'Media'}`}
           >
             {editingCell.column === 'requestedProducts' && (
               <select
@@ -1133,6 +1151,17 @@ function DataTableSection({
               <select
                 ref={bulkEditTechnologyRef}
                 defaultValue={editingRowForBulk.technology}
+                className="w-full px-2 py-1.5 text-xs border border-blue-600 rounded-md bg-white text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+              >
+                {OTHER_FIELDS.technology.map((opt) => (
+                  <option key={opt} value={opt}>{opt}</option>
+                ))}
+              </select>
+            )}
+            {editingCell.column === 'newTechnology' && (
+              <select
+                ref={bulkEditNewTechnologyRef}
+                defaultValue={editingRowForBulk.newTechnology}
                 className="w-full px-2 py-1.5 text-xs border border-blue-600 rounded-md bg-white text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
               >
                 {OTHER_FIELDS.technology.map((opt) => (
@@ -1189,6 +1218,14 @@ function DataTableSection({
                     setCellEdits((prev) => {
                       const next = { ...prev }
                       ids.forEach((id) => { next[id] = { ...next[id], technology: v } })
+                      return next
+                    })
+                  }
+                  if (editingCell.column === 'newTechnology') {
+                    const v = bulkEditNewTechnologyRef.current?.value ?? editingRowForBulk.newTechnology
+                    setCellEdits((prev) => {
+                      const next = { ...prev }
+                      ids.forEach((id) => { next[id] = { ...next[id], newTechnology: v } })
                       return next
                     })
                   }
@@ -1281,14 +1318,26 @@ function DataTableSection({
                     const str = formatAttributesFromObject(attributesFormValues, attributesModalRow.product)
                     const rowId = attributesModalRow.rowId
                     let updatedIds = [rowId]
+                    const isNewAttrs = attributesModalRow.editingNewAttributes
                     if (applyAttributesToSelectedRows && selectedRowIds.size >= 2) {
-                      const result = applyBulkAttributes(attributesModalRow.product, attributesFormValues, false, true)
-                      updatedIds = result.updatedIds ?? []
+                      const ids = Array.from(selectedRowIds)
+                      setCellEdits((prev) => {
+                        const next = { ...prev }
+                        ids.forEach((id) => {
+                          next[id] = { ...next[id], [isNewAttrs ? 'newAttributes' : 'attributes']: str }
+                        })
+                        return next
+                      })
+                      updatedIds = ids
                     } else {
-                      setCellEdits((prev) => ({ ...prev, [rowId]: { ...prev[rowId], attributes: str } }))
-                      setMatchResults((prev) => ({ ...prev, [rowId]: { ...prev[rowId], attributes: str } }))
+                      if (isNewAttrs) {
+                        setCellEdits((prev) => ({ ...prev, [rowId]: { ...prev[rowId], newAttributes: str } }))
+                      } else {
+                        setCellEdits((prev) => ({ ...prev, [rowId]: { ...prev[rowId], attributes: str } }))
+                        setMatchResults((prev) => ({ ...prev, [rowId]: { ...prev[rowId], attributes: str } }))
+                      }
                     }
-                    setLastUpdatedCells(new Set(updatedIds.map((id) => cellKey(id, 'attributes'))))
+                    setLastUpdatedCells(new Set(updatedIds.map((id) => cellKey(id, isNewAttrs ? 'newAttributes' : 'attributes'))))
                     setAttributesModalRow(null)
                     setAttributesFormValues(null)
                     setApplyAttributesToSelectedRows(false)
@@ -1321,6 +1370,24 @@ function DataTableSection({
     setAttributesModalRow({ rowId, product })
     setAttributesFormValues(parseAttributesToObject(currentAttributesString, product))
     setApplyAttributesToSelectedRows(false)
+  }
+
+  const openNewAttributesModal = (rowId, product, currentNewAttributesString) => {
+    if (!PRODUCT_ATTRIBUTES[getCategoryForRequestedProduct(product)]) return
+    if (selectedRowIds.size >= 2) {
+      const selectedRows = dataRowsWithEdits.filter((r) => selectedRowIds.has(r.id))
+      const productTypes = new Set(
+        selectedRows.map((r) => getCategoryForRequestedProduct((r.requestedProducts ?? '').toString().trim()))
+      )
+      if (productTypes.size > 1) {
+        setShowBulkAttributesMixedProductError(true)
+        return
+      }
+    }
+    setShowBulkAttributesMixedProductError(false)
+    setAttributesModalRow({ rowId, product, editingNewAttributes: true })
+    setAttributesFormValues(parseAttributesToObject(currentNewAttributesString || '—', product))
+    setApplyAttributesToSelectedRows(selectedRowIds.size >= 2)
   }
 
   return (
@@ -1723,9 +1790,9 @@ function DataTableSection({
                   </span>
                 </th>
                 <th className="w-28 px-2 py-1 text-left font-semibold text-gray-700 truncate text-xs" title="Matched Products">Matched Products</th>
-                <th className="w-24 px-2 py-1 text-left font-semibold text-gray-700 truncate text-xs" title="Media">
+                <th className="w-24 px-2 py-1 text-left font-semibold text-gray-700 truncate text-xs" title={isMacdQuote ? 'Old Media' : 'Media'}>
                   <span className="inline-flex items-center gap-0.5 truncate max-w-full">
-                    Media
+                    {isMacdQuote ? 'Old Media' : 'Media'}
                     {viewByValue === 'Media' && (
                       <button
                         type="button"
@@ -1745,6 +1812,7 @@ function DataTableSection({
                     )}
                   </span>
                 </th>
+                {isMacdQuote && <th className="w-24 px-2 py-1 text-left font-semibold text-gray-700 truncate text-xs" title="New Media">New Media</th>}
                 <th className="w-40 px-2 py-1 text-left font-semibold text-gray-700 truncate text-xs" title={isMacdQuote ? 'Old Attributes' : 'Attributes'}>{isMacdQuote ? 'Old Attributes' : 'Attributes'}</th>
                 {isMacdQuote && <th className="w-40 px-2 py-1 text-left font-semibold text-gray-700 truncate text-xs" title="New Attributes">New Attributes</th>}
                 <th className="w-24 px-2 py-1 text-left font-semibold text-gray-700 truncate text-xs" title="Confidence Level">
@@ -1970,10 +2038,10 @@ function DataTableSection({
                     )}
                   </td>
                   <td
-                    ref={editingCell?.rowId === item.row.id && editingCell?.column === 'technology' && selectedRowIds.size >= 2 ? bulkEditAnchorRef : null}
+                    ref={!isMacdQuote && editingCell?.rowId === item.row.id && editingCell?.column === 'technology' && selectedRowIds.size >= 2 ? bulkEditAnchorRef : null}
                     className="px-2 py-1 text-gray-800 align-middle min-w-0 group"
                   >
-                    {editingCell?.rowId === item.row.id && editingCell?.column === 'technology' ? (
+                    {!isMacdQuote && editingCell?.rowId === item.row.id && editingCell?.column === 'technology' ? (
                       selectedRowIds.size >= 2 ? (
                         <div className="truncate" title={item.row.technology}>{item.row.technology}</div>
                       ) : (
@@ -1994,6 +2062,10 @@ function DataTableSection({
                           ))}
                         </select>
                       )
+                    ) : isMacdQuote ? (
+                      <div className="inline-flex items-center gap-1.5 min-w-0 max-w-full flex-wrap">
+                        <span className="truncate" title={item.row.technology}>{item.row.technology}</span>
+                      </div>
                     ) : (
                       <div className="inline-flex items-center gap-1.5 min-w-0 max-w-full flex-wrap">
                         {lastUpdatedCells.has(cellKey(item.row.id, 'technology')) && UPDATED_BADGE}
@@ -2011,13 +2083,57 @@ function DataTableSection({
                       </div>
                     )}
                   </td>
+                  {isMacdQuote && (
+                    <td
+                      ref={editingCell?.rowId === item.row.id && editingCell?.column === 'newTechnology' && selectedRowIds.size >= 2 ? bulkEditAnchorRef : null}
+                      className="px-2 py-1 text-gray-800 align-middle min-w-0 group"
+                    >
+                      {editingCell?.rowId === item.row.id && editingCell?.column === 'newTechnology' ? (
+                        selectedRowIds.size >= 2 ? (
+                          <div className="truncate" title={item.row.newTechnology}>{item.row.newTechnology}</div>
+                        ) : (
+                          <select
+                            value={item.row.newTechnology}
+                            onChange={(e) => {
+                              const v = e.target.value
+                              setCellEdits((prev) => ({ ...prev, [item.row.id]: { ...prev[item.row.id], newTechnology: v } }))
+                              setLastUpdatedCells(new Set([cellKey(item.row.id, 'newTechnology')]))
+                              setEditingCell(null)
+                            }}
+                            onBlur={() => setEditingCell(null)}
+                            className="w-full min-w-[5rem] px-2 py-0.5 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 bg-white"
+                            autoFocus
+                          >
+                            {OTHER_FIELDS.technology.map((opt) => (
+                              <option key={opt} value={opt}>{opt}</option>
+                            ))}
+                          </select>
+                        )
+                      ) : (
+                        <div className="inline-flex items-center gap-1.5 min-w-0 max-w-full flex-wrap">
+                          {lastUpdatedCells.has(cellKey(item.row.id, 'newTechnology')) && UPDATED_BADGE}
+                          <span className="truncate" title={item.row.newTechnology}>{item.row.newTechnology}</span>
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); setApplyBulkEditToSelected(true); setEditingCell({ rowId: item.row.id, column: 'newTechnology' }) }}
+                            className="shrink-0 text-gray-500 opacity-0 group-hover:opacity-100 transition-opacity p-0.5 rounded hover:bg-grey-bg focus:outline-none"
+                            aria-label="Edit New Media"
+                          >
+                            <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
+                              <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z" />
+                            </svg>
+                          </button>
+                        </div>
+                      )}
+                    </td>
+                  )}
                   <td className="px-2 py-1 text-gray-800 align-middle min-w-0 group">
                     <div className="inline-flex items-center gap-1.5 min-w-0 max-w-full flex-wrap">
-                      <span className="truncate" title={item.row.attributes || 'Edit attributes'}>
+                      <span className="truncate" title={item.row.attributes || (isMacdQuote ? 'Old Attributes' : 'Edit attributes')}>
                         {item.row.attributes}
                       </span>
                       {lastUpdatedCells.has(cellKey(item.row.id, 'attributes')) && UPDATED_BADGE}
-                      {PRODUCT_ATTRIBUTES[getCategoryForRequestedProduct(item.row.requestedProducts)] && (
+                      {!isMacdQuote && PRODUCT_ATTRIBUTES[getCategoryForRequestedProduct(item.row.requestedProducts)] && (
                         <button
                           type="button"
                           onClick={(e) => { e.stopPropagation(); openAttributesModal(item.row.id, item.row.requestedProducts, item.row.attributes) }}
@@ -2032,8 +2148,32 @@ function DataTableSection({
                     </div>
                   </td>
                   {isMacdQuote && (
-                    <td className="px-2 py-1 text-gray-800 align-middle min-w-0">
-                      <div className="truncate" title={item.row.newAttributes || '—'}>{item.row.newAttributes || '—'}</div>
+                    <td className="px-2 py-1 text-gray-800 align-middle min-w-0 group">
+                      <div className="inline-flex items-center gap-1.5 min-w-0 max-w-full flex-wrap">
+                          <span
+                            role="button"
+                            tabIndex={0}
+                            onClick={(e) => { e.stopPropagation(); if (PRODUCT_ATTRIBUTES[getCategoryForRequestedProduct(item.row.requestedProducts)]) openNewAttributesModal(item.row.id, item.row.requestedProducts, item.row.newAttributes) }}
+                            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); if (PRODUCT_ATTRIBUTES[getCategoryForRequestedProduct(item.row.requestedProducts)]) openNewAttributesModal(item.row.id, item.row.requestedProducts, item.row.newAttributes) } }}
+                            className="truncate cursor-pointer hover:text-airtel-red hover:underline"
+                            title={`${item.row.newAttributes || '—'} (click to edit New Attributes)`}
+                          >
+                            {item.row.newAttributes || '—'}
+                          </span>
+                          {lastUpdatedCells.has(cellKey(item.row.id, 'newAttributes')) && UPDATED_BADGE}
+                          {PRODUCT_ATTRIBUTES[getCategoryForRequestedProduct(item.row.requestedProducts)] && (
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); openNewAttributesModal(item.row.id, item.row.requestedProducts, item.row.newAttributes) }}
+                              className="shrink-0 text-gray-500 opacity-0 group-hover:opacity-100 transition-opacity p-0.5 rounded hover:bg-grey-bg focus:outline-none"
+                              aria-label="Edit New Attributes"
+                            >
+                              <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
+                                <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z" />
+                              </svg>
+                            </button>
+                          )}
+                        </div>
                     </td>
                   )}
                   <td className="px-2 py-1 text-gray-800 align-middle min-w-0">
