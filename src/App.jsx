@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect } from 'react'
+import { useState, useRef, useCallback, useEffect, useMemo } from 'react'
 import Header from './components/Header'
 import QuoteSection from './components/QuoteSection'
 import emptystateImg from './components/emptystate.png'
@@ -10,8 +10,9 @@ import FooterActions from './components/FooterActions'
 import AccountsPage from './components/AccountsPage'
 import HomePage from './components/HomePage'
 import QuoteProposalPage from './components/QuoteProposalPage'
-import SelectQuoteLineItemsPage from './components/SelectQuoteLineItemsPage'
+import SelectQuoteLineItemsPage, { getTechnicalAttributesOverridesFromIntent } from './components/SelectQuoteLineItemsPage'
 import TechnicalEnrichmentPage from './components/TechnicalEnrichmentPage'
+import TechnicalAttributesPage from './components/TechnicalAttributesPage'
 import { LocationsProvider } from './context/LocationsContext'
 import { SAMPLE_LOCATIONS } from './data/sampleLocations'
 
@@ -86,6 +87,8 @@ function App() {
   const [showVerifyDetailsAnalysisOverlay, setShowVerifyDetailsAnalysisOverlay] = useState(false) // white transparent overlay during 4-step verify details analysis
   const [showAddProductsAnalysisOverlay, setShowAddProductsAnalysisOverlay] = useState(false) // white transparent overlay during 4-step add products from extracted analysis
   const [showUpdateChangeAnalysisOverlay, setShowUpdateChangeAnalysisOverlay] = useState(false) // white overlay during 4-step update/change analysis
+  const [showPOChangeUpdateOverlay, setShowPOChangeUpdateOverlay] = useState(false) // white overlay during/after PO change/update analysis until user clicks link
+  const [showMacdUpgradeUpdateOverlay, setShowMacdUpgradeUpdateOverlay] = useState(false) // white overlay during/after MACD upgrade update analysis until user clicks link
   const [checkFeasibilityOverlayOnSummary, setCheckFeasibilityOverlayOnSummary] = useState(false) // white overlay on summary when Check Feasibility clicked
   const [feasibilityProposalNotification, setFeasibilityProposalNotification] = useState(false) // red dot on bell + popup link
   const [feasibilityCheckInProgress, setFeasibilityCheckInProgress] = useState(false) // full screen "Feasibility Check in progress.."
@@ -124,13 +127,32 @@ function App() {
   const lastUpdateIntentRef = useRef(null)
   const skipOpenPanelOnHomeRef = useRef(false)
   const [showEnrichQuotePage, setShowEnrichQuotePage] = useState(false)
-  const [technicalEnrichmentModalOpen, setTechnicalEnrichmentModalOpen] = useState(false)
+  const [showTechnicalAttributesPage, setShowTechnicalAttributesPage] = useState(false)
+  const [compareWithAsset, setCompareWithAsset] = useState(false)
   const [hideUnmatchedRecordsBanner, setHideUnmatchedRecordsBanner] = useState(false)
   const [verificationInProgress, setVerificationInProgress] = useState(false)
   const [addedProductsFromExtractedInProgress, setAddedProductsFromExtractedInProgress] = useState(false)
   const [summaryFeasibilityEmptyInitially, setSummaryFeasibilityEmptyInitially] = useState(false)
   const [quote2ProgressStage, setQuote2ProgressStage] = useState('Draft') // 'Draft' when opened from Add Products; 'Proposal' when PO document updated in agent
   const [hasUpgradeQuoteNotification, setHasUpgradeQuoteNotification] = useState(false)
+  const [hasEnrichQuoteUpdateNotification, setHasEnrichQuoteUpdateNotification] = useState(false)
+  const [enrichingQuoteUpdateInProgress, setEnrichingQuoteUpdateInProgress] = useState(false)
+  const [enrichQuoteUpdateIntent, setEnrichQuoteUpdateIntent] = useState(null)
+  const [hasTechnicalAttributesUpdateNotification, setHasTechnicalAttributesUpdateNotification] = useState(false)
+  const [technicalAttributesUpdateIntent, setTechnicalAttributesUpdateIntent] = useState(null)
+  const [technicalAttributesOverrides, setTechnicalAttributesOverrides] = useState(null)
+  const [technicalAttributesConfiguredLocationIds, setTechnicalAttributesConfiguredLocationIds] = useState(() => new Set())
+  const [hasMacdUpgradeUpdateNotification, setHasMacdUpgradeUpdateNotification] = useState(false)
+  const [macdUpgradeUpdateInProgress, setMacdUpgradeUpdateInProgress] = useState(false)
+  const macdUpgradeUpdateIntentRef = useRef(null)
+
+  const quote1Locations = locationsForSummaryTab?.length ? locationsForSummaryTab : locationsForDownstreamTabs
+  const technicalAttributesInternetLocationIds = useMemo(() => {
+    const products = ['Internet', 'SD WAN', 'MPLS']
+    return new Set(
+      (quote1Locations || []).map((loc, i) => ({ id: loc.id, product: products[i % products.length] })).filter((x) => x.product === 'Internet').map((x) => x.id)
+    )
+  }, [quote1Locations])
 
   const activeNavTab = currentPage
 
@@ -155,6 +177,65 @@ function App() {
     setExtractionInProgress(true)
     setHasUpgradeQuoteNotification(false)
     setTimeout(() => setExtractionInProgress(false), 2000)
+  }, [])
+
+  const onNavigateToEnrichQuoteUpdate = useCallback((intentText) => {
+    setShowPOChangeUpdateOverlay(false)
+    setEnrichQuoteUpdateIntent((prev) => intentText ?? prev)
+    setHasEnrichQuoteUpdateNotification(false)
+    setCurrentPage('Quote')
+    setSelectedQuote('Quote 2')
+    setShowEnrichQuotePage(true)
+    setEnrichingQuoteUpdateInProgress(true)
+    setTimeout(() => setEnrichingQuoteUpdateInProgress(false), 2000)
+  }, [])
+
+  const onEnrichQuoteUpdateCreated = useCallback((intentText) => {
+    setEnrichQuoteUpdateIntent(intentText ?? null)
+    setHasEnrichQuoteUpdateNotification(true)
+  }, [])
+
+  const onTechnicalAttributesUpdateCreated = useCallback((intentText) => {
+    setTechnicalAttributesUpdateIntent(intentText ?? null)
+    setHasTechnicalAttributesUpdateNotification(true)
+  }, [])
+
+  const onNavigateToTechnicalAttributesUpdate = useCallback((intentText) => {
+    setShowPOChangeUpdateOverlay(false)
+    setHasTechnicalAttributesUpdateNotification(false)
+    const intent = intentText ?? technicalAttributesUpdateIntent
+    setEnrichQuoteUpdateIntent(intent ?? null)
+    const overrides = intent ? getTechnicalAttributesOverridesFromIntent(intent) : null
+    setTechnicalAttributesOverrides(overrides)
+    setCurrentPage('Quote')
+    setSelectedQuote('Quote 2')
+    setShowEnrichQuotePage(true)
+    setEnrichingQuoteUpdateInProgress(true)
+    setTimeout(() => setEnrichingQuoteUpdateInProgress(false), 2000)
+  }, [technicalAttributesUpdateIntent])
+
+  const onMacdUpgradeUpdateCreated = useCallback((intentText) => {
+    macdUpgradeUpdateIntentRef.current = intentText ?? null
+    setHasMacdUpgradeUpdateNotification(true)
+  }, [])
+
+  const onNavigateToMacdUpgradeUpdate = useCallback((intentText) => {
+    setShowMacdUpgradeUpdateOverlay(false)
+    setHasMacdUpgradeUpdateNotification(false)
+    setSelectedQuote('MACD Quote')
+    setCurrentPage('Quote')
+    setActiveTab('Extracted Information')
+    setMacdUpgradeUpdateInProgress(true)
+    macdUpgradeUpdateIntentRef.current = intentText ?? macdUpgradeUpdateIntentRef.current
+    setTimeout(() => {
+      setMacdUpgradeUpdateInProgress(false)
+      const intent = macdUpgradeUpdateIntentRef.current
+      const columns = []
+      if (intent && /\bnew\s+attributes?\b/i.test(intent)) columns.push('newAttributes')
+      if (intent && /\bnew\s+media\b/i.test(intent)) columns.push('newTechnology')
+      if (columns.length === 0) columns.push('newAttributes', 'newTechnology')
+      quoteActionsRef.current?.showMacdUpdatedBadgeForColumns?.(columns, intent)
+    }, 2000)
   }, [])
 
   const handleContinueWithSelected = useCallback(() => {
@@ -254,6 +335,14 @@ function App() {
       {showUpdateChangeAnalysisOverlay && (
         <div className="fixed inset-0 z-40 bg-white/70 pointer-events-none" aria-hidden />
       )}
+      {/* White transparent overlay during/after PO change/update analysis (4 steps + message with link) until user clicks "Updated Enrich Quote" */}
+      {showPOChangeUpdateOverlay && (
+        <div className="fixed inset-0 z-40 bg-white/70 pointer-events-none" aria-hidden />
+      )}
+      {/* White transparent overlay during/after MACD upgrade update analysis (4 steps + message with link) until user clicks "Updates on the upgrade Quote for HDFC Bank" */}
+      {showMacdUpgradeUpdateOverlay && (
+        <div className="fixed inset-0 z-40 bg-white/70 pointer-events-none" aria-hidden />
+      )}
       {/* Full-screen white overlay when products are getting matched */}
       {revealMatchedResultsInProgress && (
         <div className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-3 bg-white/95" aria-live="polite">
@@ -296,6 +385,17 @@ function App() {
             ))}
           </div>
           <p className="text-sm font-semibold text-gray-700">Data is getting verified</p>
+        </div>
+      )}
+      {/* Full-screen white overlay when enriching quote update or MACD upgrade update */}
+      {(enrichingQuoteUpdateInProgress || macdUpgradeUpdateInProgress) && (
+        <div className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-3 bg-white/95" aria-live="polite">
+          <div className="flex gap-1" aria-hidden="true">
+            {[0, 1, 2, 3, 4].map((i) => (
+              <span key={i} className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" style={{ animationDelay: `${i * 0.1}s` }} />
+            ))}
+          </div>
+          <p className="text-sm font-semibold text-gray-700">Updating the values...</p>
         </div>
       )}
       <Header
@@ -373,10 +473,23 @@ function App() {
         updatedRequestedValuesNotification={hasUpdatedRequestedValuesNotification}
         onNavigateToUpdatedRequestedValues={onNavigateToUpdatedRequestedValues}
         onUpdatedRequestedValuesCreated={onUpdatedRequestedValuesCreated}
-        onMarkAllNotificationsRead={() => { setHasUpdatedRequestedValuesNotification(false); setFeasibilityProposalNotification(false); setValidateQuoteNotification(false); setUpdatedConfigurationsToQuoteNotification(false); setHasUpgradeQuoteNotification(false) }}
+        onMarkAllNotificationsRead={() => { setHasUpdatedRequestedValuesNotification(false); setFeasibilityProposalNotification(false); setValidateQuoteNotification(false); setUpdatedConfigurationsToQuoteNotification(false); setHasUpgradeQuoteNotification(false); setHasEnrichQuoteUpdateNotification(false); setHasTechnicalAttributesUpdateNotification(false); setHasMacdUpgradeUpdateNotification(false) }}
         updatedUpgradeQuoteNotification={hasUpgradeQuoteNotification}
         onNavigateToUpgradeQuote={onNavigateToUpgradeQuote}
         onUpgradeQuoteCreated={() => setHasUpgradeQuoteNotification(true)}
+        updatedEnrichQuoteUpdateNotification={hasEnrichQuoteUpdateNotification}
+        enrichQuoteUpdateIntent={enrichQuoteUpdateIntent}
+        onNavigateToEnrichQuoteUpdate={onNavigateToEnrichQuoteUpdate}
+        onEnrichQuoteUpdateCreated={onEnrichQuoteUpdateCreated}
+        updatedTechnicalAttributesUpdateNotification={hasTechnicalAttributesUpdateNotification}
+        technicalAttributesUpdateIntent={technicalAttributesUpdateIntent}
+        onNavigateToTechnicalAttributesUpdate={onNavigateToTechnicalAttributesUpdate}
+        onTechnicalAttributesUpdateCreated={onTechnicalAttributesUpdateCreated}
+        updatedMacdUpgradeUpdateNotification={hasMacdUpgradeUpdateNotification}
+        onNavigateToMacdUpgradeUpdate={onNavigateToMacdUpgradeUpdate}
+        onMacdUpgradeUpdateCreated={onMacdUpgradeUpdateCreated}
+        onMacdUpgradeUpdateAnalysisStart={() => setShowMacdUpgradeUpdateOverlay(true)}
+        macdQuoteActive={selectedQuote === 'MACD Quote'}
         onMarkAllNotificationsReadOnNavigateToQuote={() => { /* do not clear requested-values notification when on Quote so bell + popup show after update/change flow */ }}
         updatedConfigurationsToQuoteNotification={updatedConfigurationsToQuoteNotification}
         onNavigateToUpdatedConfigurationsToQuote={() => {
@@ -418,6 +531,7 @@ function App() {
           }, 2000)
         }}
         restoreQuoteAgentforceKey={AGENTFORCE_QUOTE_RESTORE_KEY}
+        enrichQuoteFlowActive={showEnrichQuotePage}
         quoteActionsRef={quoteActionsRef}
         skipOpenPanelOnHomeRef={skipOpenPanelOnHomeRef}
         onNavigateToQuote2={() => {
@@ -436,6 +550,9 @@ function App() {
         onAddProductsAnalysisEnd={() => setShowAddProductsAnalysisOverlay(false)}
         onUpdateChangeAnalysisStart={() => setShowUpdateChangeAnalysisOverlay(true)}
         onUpdateChangeAnalysisEnd={() => setShowUpdateChangeAnalysisOverlay(false)}
+        onPOChangeUpdateAnalysisStart={() => setShowPOChangeUpdateOverlay(true)}
+        technicalAttributesPageActive={showEnrichQuotePage && showTechnicalAttributesPage}
+        onTechnicalAttributesToggleCompareWithAsset={() => setCompareWithAsset(true)}
       />
       <main className="flex-1 flex flex-col p-6 max-w-[1920px] w-full mx-auto pb-4 min-h-0">
         <LocationsProvider value={{ locations: locationsForDownstreamTabs, onUpdateLocation: handleUpdateLocation, onDeleteLocations: handleDeleteLocations }}>
@@ -748,43 +865,36 @@ function App() {
               </div>
             )}
             </div>
+            ) : showEnrichQuotePage && showTechnicalAttributesPage ? (
+              <TechnicalAttributesPage
+                compareWithAsset={compareWithAsset}
+                onCompareWithAssetChange={setCompareWithAsset}
+                technicalAttributesOverrides={technicalAttributesOverrides}
+                productFilterLocationIds={technicalAttributesInternetLocationIds}
+                onBackToEnrichQuote={() => {
+                  setShowTechnicalAttributesPage(false)
+                  setCompareWithAsset(false)
+                }}
+                onSaveWithConfiguredLocations={(ids) => {
+                  setTechnicalAttributesConfiguredLocationIds(ids instanceof Set ? ids : new Set(ids || []))
+                }}
+                onBackToQuote={() => {
+                  setShowTechnicalAttributesPage(false)
+                  setShowEnrichQuotePage(false)
+                  setCompareWithAsset(false)
+                  setEnrichQuoteUpdateIntent(null)
+                  setTechnicalAttributesOverrides(null)
+                  setTechnicalAttributesConfiguredLocationIds(new Set())
+                }}
+              />
             ) : showEnrichQuotePage ? (
-              <>
-                <SelectQuoteLineItemsPage
-                  onBack={() => setShowEnrichQuotePage(false)}
-                  quote1Locations={locationsForSummaryTab?.length ? locationsForSummaryTab : locationsForDownstreamTabs}
-                  onTechnicalAttributesClick={() => setTechnicalEnrichmentModalOpen(true)}
-                />
-                {technicalEnrichmentModalOpen && (
-                  <div
-                    className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50"
-                    role="dialog"
-                    aria-modal="true"
-                    aria-labelledby="technical-enrichment-modal-title"
-                    onClick={(e) => e.target === e.currentTarget && setTechnicalEnrichmentModalOpen(false)}
-                  >
-                    <div className="bg-white rounded-xl shadow-xl border border-gray-200 w-full max-w-[98vw] h-[90vh] flex flex-col overflow-hidden" onClick={(e) => e.stopPropagation()}>
-                      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 shrink-0">
-                        <div className="w-8 shrink-0" aria-hidden="true" />
-                        <h2 id="technical-enrichment-modal-title" className="flex-1 text-center text-base font-semibold text-gray-900">Technical Attributes</h2>
-                        <button
-                          type="button"
-                          onClick={() => setTechnicalEnrichmentModalOpen(false)}
-                          className="p-1.5 rounded-lg text-gray-500 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-airtel-red/20"
-                          aria-label="Close"
-                        >
-                          <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                            <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-                          </svg>
-                        </button>
-                      </div>
-                      <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
-                        <TechnicalEnrichmentPage embedInModal onClose={() => setTechnicalEnrichmentModalOpen(false)} />
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </>
+              <SelectQuoteLineItemsPage
+                onBack={() => { setShowEnrichQuotePage(false); setEnrichQuoteUpdateIntent(null); setTechnicalAttributesConfiguredLocationIds(new Set()) }}
+                quote1Locations={locationsForSummaryTab?.length ? locationsForSummaryTab : locationsForDownstreamTabs}
+                onTechnicalAttributesClick={() => setShowTechnicalAttributesPage(true)}
+                enrichQuoteUpdateIntent={enrichQuoteUpdateIntent}
+                technicalAttributesConfiguredLocationIds={technicalAttributesConfiguredLocationIds}
+              />
             ) : (
               <QuoteProposalPage progressStage={quote2ProgressStage} onEnrichQuoteClick={() => setShowEnrichQuotePage(true)} />
             )}

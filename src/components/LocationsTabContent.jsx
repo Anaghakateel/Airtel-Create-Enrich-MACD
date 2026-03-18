@@ -1,5 +1,6 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useMemo } from 'react'
 import { useLocations } from '../context/LocationsContext'
+import { useResizableColumns } from '../hooks/useResizableColumns'
 
 // Parse street display from "number, Street, City, State, India"
 function getStreetDisplay(streetAddress) {
@@ -85,9 +86,14 @@ function EditableCell({ loc, field, displayValue, onUpdate, className = '', show
   )
 }
 
-function LocationsTabContent({ locations: locationsProp, configuredLocationIds = new Set(), onMarkLocationsConfigured, onUpdateLocation: onUpdateLocationProp, onSelectionChange, onDeleteLocations: onDeleteLocationsProp, showAddConfigurationsButton = true, successBannerVariant }) {
+function LocationsTabContent({ locations: locationsProp, configuredLocationIds = new Set(), onMarkLocationsConfigured, onUpdateLocation: onUpdateLocationProp, onSelectionChange, onDeleteLocations: onDeleteLocationsProp, showAddConfigurationsButton = true, successBannerVariant, productFilterLocationIds }) {
   const { locations: ctxLocations, onUpdateLocation: ctxOnUpdate, onDeleteLocations: ctxOnDelete } = useLocations()
-  const locations = locationsProp !== undefined && locationsProp !== null ? locationsProp : ctxLocations
+  const locationsRaw = locationsProp !== undefined && locationsProp !== null ? locationsProp : ctxLocations
+  const locations = useMemo(() => {
+    if (!productFilterLocationIds || productFilterLocationIds.size === 0) return locationsRaw
+    const idSet = productFilterLocationIds instanceof Set ? productFilterLocationIds : new Set(productFilterLocationIds)
+    return locationsRaw.filter((loc) => idSet.has(loc.id))
+  }, [locationsRaw, productFilterLocationIds])
   const onUpdateLocation = onUpdateLocationProp ?? ctxOnUpdate
   const onDeleteLocations = onDeleteLocationsProp ?? ctxOnDelete
 
@@ -110,6 +116,23 @@ function LocationsTabContent({ locations: locationsProp, configuredLocationIds =
   const [deleteModalRow, setDeleteModalRow] = useState(null)
   const [applyDeleteToSelectedRows, setApplyDeleteToSelectedRows] = useState(false)
   const selectAllCheckboxRef = useRef(null)
+  const locationsResizableCols = useMemo(() => [
+    { id: 'offerAssigned', label: 'Offer Assigned' },
+    { id: 'streetAddress', label: 'Street Address' },
+    { id: 'floorNo', label: 'Floor No' },
+    { id: 'flatNo', label: 'Flat No' },
+    { id: 'city', label: 'City' },
+    { id: 'state', label: 'State' },
+    { id: 'country', label: 'Country' },
+    { id: 'premises', label: 'Premises' },
+    { id: 'postalCode', label: 'Postal Code' },
+    { id: 'servicePoint', label: 'Service Point' },
+    { id: 'locationType', label: 'Location Type' },
+    { id: 'solutionType', label: 'Solution Type' },
+    { id: 'circle', label: 'Circle' },
+    { id: 'source', label: 'Source' },
+  ], [])
+  const { getColStyle, ResizeHandle } = useResizableColumns(locationsResizableCols)
 
   const filteredByViewBy =
     viewBy === 'Show Configured locations'
@@ -311,9 +334,13 @@ function LocationsTabContent({ locations: locationsProp, configuredLocationIds =
       <div className="overflow-x-auto flex flex-col min-h-0 flex-1 flex-shrink-0" style={{ minHeight: '20rem' }}>
         <div className="overflow-y-auto border-b border-gray-200 min-h-0 flex-1">
           <table className="w-full text-xs leading-relaxed table-fixed locations-table" style={{ minWidth: '72rem' }}>
+            <colgroup>
+              <col className="w-10" />
+              {locationsResizableCols.map((c) => <col key={c.id} style={getColStyle(c.id)} />)}
+            </colgroup>
             <thead className="sticky top-0 z-10 bg-gray-100">
               <tr className="border-b border-gray-200">
-                <th className="w-10 pl-4 pr-2 py-4 text-left">
+                <th className="w-10 pl-4 pr-2 py-4 text-left shrink-0">
                   <input
                     ref={selectAllCheckboxRef}
                     type="checkbox"
@@ -329,20 +356,20 @@ function LocationsTabContent({ locations: locationsProp, configuredLocationIds =
                     }}
                   />
                 </th>
-                <th className="w-24 px-2 py-4 text-left font-semibold text-gray-900">Offer Assigned</th>
-                <th className="min-w-[14rem] px-2 py-4 text-left font-semibold text-gray-900">Street Address</th>
-                <th className="w-20 px-2 py-4 text-left font-semibold text-gray-900">Floor No</th>
-                <th className="w-20 px-2 py-4 text-left font-semibold text-gray-900">Flat No</th>
-                <th className="min-w-[6rem] px-2 py-4 text-left font-semibold text-gray-900">City</th>
-                <th className="min-w-[5rem] px-2 py-4 text-left font-semibold text-gray-900">State</th>
-                <th className="min-w-[5rem] px-2 py-4 text-left font-semibold text-gray-900">Country</th>
-                <th className="w-24 px-2 py-4 text-left font-semibold text-gray-900">Premises</th>
-                <th className="w-24 px-2 py-4 text-left font-semibold text-gray-900">Postal Code</th>
-                <th className="w-28 px-2 py-4 text-left font-semibold text-gray-900">Service Point</th>
-                <th className="w-28 px-2 py-4 text-left font-semibold text-gray-900">Location Type</th>
-                <th className="w-28 px-2 py-4 text-left font-semibold text-gray-900">Solution Type</th>
-                <th className="w-20 px-2 py-4 text-left font-semibold text-gray-900">Circle</th>
-                <th className="w-28 px-2 py-4 text-left font-semibold text-gray-900">Source</th>
+                <th className="px-2 py-4 text-left font-semibold text-gray-900 group relative" style={getColStyle('offerAssigned')}><span className="block truncate">Offer Assigned</span><ResizeHandle columnId="offerAssigned" /></th>
+                <th className="px-2 py-4 text-left font-semibold text-gray-900 group relative" style={getColStyle('streetAddress')}><span className="block truncate">Street Address</span><ResizeHandle columnId="streetAddress" /></th>
+                <th className="px-2 py-4 text-left font-semibold text-gray-900 group relative" style={getColStyle('floorNo')}><span className="block truncate">Floor No</span><ResizeHandle columnId="floorNo" /></th>
+                <th className="px-2 py-4 text-left font-semibold text-gray-900 group relative" style={getColStyle('flatNo')}><span className="block truncate">Flat No</span><ResizeHandle columnId="flatNo" /></th>
+                <th className="px-2 py-4 text-left font-semibold text-gray-900 group relative" style={getColStyle('city')}><span className="block truncate">City</span><ResizeHandle columnId="city" /></th>
+                <th className="px-2 py-4 text-left font-semibold text-gray-900 group relative" style={getColStyle('state')}><span className="block truncate">State</span><ResizeHandle columnId="state" /></th>
+                <th className="px-2 py-4 text-left font-semibold text-gray-900 group relative" style={getColStyle('country')}><span className="block truncate">Country</span><ResizeHandle columnId="country" /></th>
+                <th className="px-2 py-4 text-left font-semibold text-gray-900 group relative" style={getColStyle('premises')}><span className="block truncate">Premises</span><ResizeHandle columnId="premises" /></th>
+                <th className="px-2 py-4 text-left font-semibold text-gray-900 group relative" style={getColStyle('postalCode')}><span className="block truncate">Postal Code</span><ResizeHandle columnId="postalCode" /></th>
+                <th className="px-2 py-4 text-left font-semibold text-gray-900 group relative" style={getColStyle('servicePoint')}><span className="block truncate">Service Point</span><ResizeHandle columnId="servicePoint" /></th>
+                <th className="px-2 py-4 text-left font-semibold text-gray-900 group relative" style={getColStyle('locationType')}><span className="block truncate">Location Type</span><ResizeHandle columnId="locationType" /></th>
+                <th className="px-2 py-4 text-left font-semibold text-gray-900 group relative" style={getColStyle('solutionType')}><span className="block truncate">Solution Type</span><ResizeHandle columnId="solutionType" /></th>
+                <th className="px-2 py-4 text-left font-semibold text-gray-900 group relative" style={getColStyle('circle')}><span className="block truncate">Circle</span><ResizeHandle columnId="circle" /></th>
+                <th className="px-2 py-4 text-left font-semibold text-gray-900 group relative" style={getColStyle('source')}><span className="block truncate">Source</span><ResizeHandle columnId="source" /></th>
               </tr>
             </thead>
             <tbody>

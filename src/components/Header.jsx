@@ -4,6 +4,7 @@ import agentforceIcon from './AgentforceIcon.png'
 import AgentforceSidePanel from './AgentforceSidePanel'
 
 const AGENTFORCE_CONVERSATION_SNAPSHOT_KEY = 'agentforce_conversation_snapshot'
+const AGENTFORCE_ENRICH_QUOTE_RESTORE_KEY = 'airtel_esm_agentforce_enrich_quote_restore'
 
 function getStoredQuoteRestore(key) {
   if (!key) return null
@@ -44,7 +45,7 @@ const DEFAULT_QUOTE1_PANEL_SNAPSHOT = {
   hasNotification: false,
 }
 
-function Header({ activeNavTab = 'Quote', onNavClick, selectedQuote = 'Quote 1', onQuoteSelect, onNavigateToQuoteExtractedInfo, onNavigateToUpdatedQuote, updatedQuoteNotification = false, onNavigateToUpdatedQuote2, updatedQuoteProposal2Notification = false, onNavigateToUpdatedQuote3, updatedQuoteProposal3Notification = false, onNavigateToUpdatedQuote4, updatedQuoteProposal4Notification = false, attributesUpdatedNotification = false, onAttributesUpdated, onNavigateToAttributesUpdatedView, updatedMatchedProductsNotification = false, onNavigateToUpdatedMatchedProducts, updatedRequestedValuesNotification = false, onNavigateToUpdatedRequestedValues, onUpdatedRequestedValuesCreated, onMarkAllNotificationsRead, feasibilityProposalNotification = false, onNavigateToFeasibilityProposal, validateQuoteNotification = false, onNavigateToValidatedQuote, updatedConfigurationsToQuoteNotification = false, onNavigateToUpdatedConfigurationsToQuote, onMarkAllNotificationsReadOnNavigateToQuote, restoreQuoteAgentforceKey, quoteActionsRef, agentforcePanelOpen: agentforcePanelOpenProp, onAgentforcePanelChange, skipOpenPanelOnHomeRef, onNavigateToQuote2, onQuote2POUpdated, quote2ProgressStage = 'Draft', onMatchProductsResponseShown, onMatchProductsAnalysisStart, onMatchProductsAnalysisEnd, onVerifyDetailsResponseShown, onVerifyDetailsAnalysisStart, onVerifyDetailsAnalysisEnd, onAddProductsResponseShown, onAddProductsAnalysisStart, onAddProductsAnalysisEnd, onUpdateChangeAnalysisStart, onUpdateChangeAnalysisEnd, updatedUpgradeQuoteNotification = false, onNavigateToUpgradeQuote, onUpgradeQuoteCreated }) {
+function Header({ activeNavTab = 'Quote', onNavClick, selectedQuote = 'Quote 1', onQuoteSelect, onNavigateToQuoteExtractedInfo, onNavigateToUpdatedQuote, updatedQuoteNotification = false, onNavigateToUpdatedQuote2, updatedQuoteProposal2Notification = false, onNavigateToUpdatedQuote3, updatedQuoteProposal3Notification = false, onNavigateToUpdatedQuote4, updatedQuoteProposal4Notification = false, attributesUpdatedNotification = false, onAttributesUpdated, onNavigateToAttributesUpdatedView, updatedMatchedProductsNotification = false, onNavigateToUpdatedMatchedProducts, updatedRequestedValuesNotification = false, onNavigateToUpdatedRequestedValues, onUpdatedRequestedValuesCreated, onMarkAllNotificationsRead, feasibilityProposalNotification = false, onNavigateToFeasibilityProposal, validateQuoteNotification = false, onNavigateToValidatedQuote, updatedConfigurationsToQuoteNotification = false, onNavigateToUpdatedConfigurationsToQuote, onMarkAllNotificationsReadOnNavigateToQuote, restoreQuoteAgentforceKey, enrichQuoteFlowActive = false, quoteActionsRef, agentforcePanelOpen: agentforcePanelOpenProp, onAgentforcePanelChange, skipOpenPanelOnHomeRef, onNavigateToQuote2, onQuote2POUpdated, quote2ProgressStage = 'Draft', onMatchProductsResponseShown, onMatchProductsAnalysisStart, onMatchProductsAnalysisEnd, onVerifyDetailsResponseShown, onVerifyDetailsAnalysisStart, onVerifyDetailsAnalysisEnd, onAddProductsResponseShown, onAddProductsAnalysisStart, onAddProductsAnalysisEnd, onUpdateChangeAnalysisStart, onUpdateChangeAnalysisEnd, updatedUpgradeQuoteNotification = false, onNavigateToUpgradeQuote, onUpgradeQuoteCreated, updatedEnrichQuoteUpdateNotification = false, enrichQuoteUpdateIntent, onNavigateToEnrichQuoteUpdate, onEnrichQuoteUpdateCreated, onPOChangeUpdateAnalysisStart, technicalAttributesPageActive = false, onTechnicalAttributesToggleCompareWithAsset, updatedTechnicalAttributesUpdateNotification = false, technicalAttributesUpdateIntent, onNavigateToTechnicalAttributesUpdate, onTechnicalAttributesUpdateCreated, updatedMacdUpgradeUpdateNotification = false, onNavigateToMacdUpgradeUpdate, onMacdUpgradeUpdateCreated, onMacdUpgradeUpdateAnalysisStart, macdQuoteActive = false }) {
   const effectiveRestoreKey =
     restoreQuoteAgentforceKey && activeNavTab === 'Quote' && selectedQuote
       ? `${restoreQuoteAgentforceKey}_${String(selectedQuote).replace(/\s/g, '')}`
@@ -112,19 +113,32 @@ function Header({ activeNavTab = 'Quote', onNavClick, selectedQuote = 'Quote 1',
 
   // When user goes to Quote (e.g. via "here" link or bell notification), show the conversation that happened so far; prefer persisted conversation snapshot so chat from Home is reflected on Quote page
   const conversationSnapshot = getStoredConversationSnapshot()
+  const enrichQuoteStored = enrichQuoteFlowActive ? (() => {
+    try {
+      const s = localStorage.getItem(AGENTFORCE_ENRICH_QUOTE_RESTORE_KEY)
+      if (!s) return null
+      const j = JSON.parse(s)
+      if (j && typeof j.isConversationView === 'boolean' && Array.isArray(j.messages)) return j
+      return null
+    } catch (_) { return null }
+  })() : null
   const snapshotToPass =
     agentforcePanelOpen
       ? activeNavTab === 'Quote'
-            ? (conversationSnapshot?.messages?.length
+            ? (enrichQuoteFlowActive && enrichQuoteStored?.messages?.length
+            ? enrichQuoteStored
+            : conversationSnapshot?.messages?.length
             ? conversationSnapshot
             : stored?.snapshot && typeof stored.snapshot.isConversationView === 'boolean' && Array.isArray(stored.snapshot.messages)
               ? stored.snapshot
               : selectedQuote === 'Quote 1' || selectedQuote === 'MACD Quote' || (selectedQuote === 'Quote 2' && quote2ProgressStage === 'Draft')
                 ? DEFAULT_QUOTE1_PANEL_SNAPSHOT
                 : null)
-        : conversationSnapshot?.messages?.length
-          ? conversationSnapshot
-          : null
+        : enrichQuoteFlowActive && enrichQuoteStored?.messages?.length
+          ? enrichQuoteStored
+          : conversationSnapshot?.messages?.length
+            ? conversationSnapshot
+            : null
       : null
 
   useEffect(() => {
@@ -132,6 +146,19 @@ function Header({ activeNavTab = 'Quote', onNavClick, selectedQuote = 'Quote 1',
       try { localStorage.removeItem(effectiveRestoreKey) } catch (_) {}
     }
   }, [effectiveRestoreKey, activeNavTab])
+
+  // When navigating to Enrich Quote, sync conversation from general snapshot to Enrich Quote restore key so panel shows PO/Quote conversation history
+  useEffect(() => {
+    if (enrichQuoteFlowActive) {
+      const conv = getStoredConversationSnapshot()
+      if (conv?.messages?.length) {
+        try {
+          const payload = { isConversationView: conv.isConversationView, messages: conv.messages, hasNotification: conv.hasNotification ?? false, isPinned: conv.isPinned ?? false }
+          localStorage.setItem(AGENTFORCE_ENRICH_QUOTE_RESTORE_KEY, JSON.stringify(payload))
+        } catch (_) {}
+      }
+    }
+  }, [enrichQuoteFlowActive])
 
   // When Quote page opens, clear the red dot on the bell icon (except "Updated Configurations to Quote" which is set while on Quote)
   useEffect(() => {
@@ -163,7 +190,7 @@ function Header({ activeNavTab = 'Quote', onNavClick, selectedQuote = 'Quote 1',
 
   return (
     <>
-    <header className="bg-white border-b border-gray-200 sticky top-0 z-[60]">
+    <header className={`bg-white border-b border-gray-200 sticky top-0 ${notificationPopoverOpen ? 'z-[100]' : 'z-[60]'}`}>
       {/* Top row: logo (left), search (center), status pills + utility icons (right) */}
       <div className="flex items-center justify-between gap-4 px-6 py-3">
         <div className="shrink-0 w-[120px]">
@@ -238,7 +265,7 @@ function Header({ activeNavTab = 'Quote', onNavClick, selectedQuote = 'Quote 1',
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
               </svg>
-              {(bellNotification || updatedQuoteNotification || updatedQuoteProposal2Notification || updatedQuoteProposal3Notification || updatedQuoteProposal4Notification || attributesUpdatedNotification || updatedMatchedProductsNotification || updatedRequestedValuesNotification || feasibilityProposalNotification || validateQuoteNotification || updatedConfigurationsToQuoteNotification || updatedUpgradeQuoteNotification) && (
+              {(bellNotification || updatedQuoteNotification || updatedQuoteProposal2Notification || updatedQuoteProposal3Notification || updatedQuoteProposal4Notification || attributesUpdatedNotification || updatedMatchedProductsNotification || updatedRequestedValuesNotification || feasibilityProposalNotification || validateQuoteNotification || updatedConfigurationsToQuoteNotification || updatedUpgradeQuoteNotification || updatedEnrichQuoteUpdateNotification || updatedTechnicalAttributesUpdateNotification || updatedMacdUpgradeUpdateNotification) && (
                 <span className="absolute -top-0.5 right-0 min-w-[18px] h-[18px] px-1 rounded-full bg-airtel-red text-white text-[10px] font-bold flex items-center justify-center ring-2 ring-white">1</span>
               )}
             </button>
@@ -270,11 +297,62 @@ function Header({ activeNavTab = 'Quote', onNavClick, selectedQuote = 'Quote 1',
                   </div>
                   <div className="max-h-64 overflow-y-auto py-2">
                     {(() => {
-                      const mostRecent = updatedUpgradeQuoteNotification ? 'upgradeQuote' : updatedConfigurationsToQuoteNotification ? 'updatedConfigurationsToQuote' : validateQuoteNotification ? 'validatedQuote' : feasibilityProposalNotification ? 'feasibility' : updatedRequestedValuesNotification ? 'updatedRequestedValues' : updatedMatchedProductsNotification ? 'matchedProducts' : attributesUpdatedNotification ? 'attributes' : updatedQuoteProposal4Notification ? 'proposal4' : updatedQuoteProposal3Notification ? 'proposal3' : updatedQuoteProposal2Notification ? 'proposal2' : updatedQuoteNotification ? 'proposal1' : 'new'
+                      const mostRecent = updatedMacdUpgradeUpdateNotification ? 'macdUpgradeUpdate' : updatedTechnicalAttributesUpdateNotification ? 'technicalAttributesUpdate' : updatedEnrichQuoteUpdateNotification ? 'enrichQuoteUpdate' : updatedUpgradeQuoteNotification ? 'upgradeQuote' : updatedConfigurationsToQuoteNotification ? 'updatedConfigurationsToQuote' : validateQuoteNotification ? 'validatedQuote' : feasibilityProposalNotification ? 'feasibility' : updatedRequestedValuesNotification ? 'updatedRequestedValues' : updatedMatchedProductsNotification ? 'matchedProducts' : attributesUpdatedNotification ? 'attributes' : updatedQuoteProposal4Notification ? 'proposal4' : updatedQuoteProposal3Notification ? 'proposal3' : updatedQuoteProposal2Notification ? 'proposal2' : updatedQuoteNotification ? 'proposal1' : 'new'
                       const linkClass = (isRecent) => isRecent ? 'text-sm font-semibold text-airtel-red hover:text-red-800 hover:underline text-left w-full' : 'text-sm font-semibold text-gray-400 hover:text-gray-600 text-left w-full'
                       const timeClass = (isRecent) => isRecent ? 'text-xs text-gray-600 mt-0.5' : 'text-xs text-gray-400 mt-0.5'
                       return (
                         <>
+                    {updatedMacdUpgradeUpdateNotification && (
+                      <div className="px-4 py-3 hover:bg-grey-bg border-b border-gray-100">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            onNavigateToMacdUpgradeUpdate?.()
+                            setNotificationPopoverOpen(false)
+                            setBellNotification(false)
+                            onMarkAllNotificationsRead?.()
+                          }}
+                          className={linkClass(mostRecent === 'macdUpgradeUpdate')}
+                        >
+                          Updates on the upgrade Quote for HDFC Bank
+                        </button>
+                        <p className={timeClass(mostRecent === 'macdUpgradeUpdate')}>Just now</p>
+                      </div>
+                    )}
+                    {updatedTechnicalAttributesUpdateNotification && (
+                      <div className="px-4 py-3 hover:bg-grey-bg border-b border-gray-100">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            onNavigateToTechnicalAttributesUpdate?.(technicalAttributesUpdateIntent)
+                            setNotificationPopoverOpen(false)
+                            setBellNotification(false)
+                            onMarkAllNotificationsRead?.()
+                          }}
+                          className={linkClass(mostRecent === 'technicalAttributesUpdate')}
+                        >
+                          Updated Technical Attributes for Enrich Quote
+                        </button>
+                        <p className={timeClass(mostRecent === 'technicalAttributesUpdate')}>Just now</p>
+                      </div>
+                    )}
+                    {updatedEnrichQuoteUpdateNotification && (
+                      <div className="px-4 py-3 hover:bg-grey-bg border-b border-gray-100">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            onNavigateToEnrichQuoteUpdate?.(enrichQuoteUpdateIntent)
+                            setNotificationPopoverOpen(false)
+                            setBellNotification(false)
+                            onMarkAllNotificationsRead?.()
+                          }}
+                          className={linkClass(mostRecent === 'enrichQuoteUpdate')}
+                        >
+                          Updated Enrich Quote
+                        </button>
+                        <p className={timeClass(mostRecent === 'enrichQuoteUpdate')}>Just now</p>
+                      </div>
+                    )}
                     {updatedUpgradeQuoteNotification && (
                       <div className="px-4 py-3 hover:bg-grey-bg border-b border-gray-100">
                         <button
@@ -624,12 +702,36 @@ function Header({ activeNavTab = 'Quote', onNavClick, selectedQuote = 'Quote 1',
         onAddProductsAnalysisEnd={onAddProductsAnalysisEnd}
         onUpdateChangeAnalysisStart={onUpdateChangeAnalysisStart}
         onUpdateChangeAnalysisEnd={onUpdateChangeAnalysisEnd}
+        onPOChangeUpdateAnalysisStart={onPOChangeUpdateAnalysisStart}
         onUpgradeQuoteCreated={() => {
           setBellNotification(true)
           setNotificationPopoverOpen(true)
           onUpgradeQuoteCreated?.()
         }}
         onNavigateToUpgradeQuote={onNavigateToUpgradeQuote}
+        onEnrichQuoteUpdateCreated={(intentText) => {
+          setBellNotification(true)
+          setNotificationPopoverOpen(true)
+          onEnrichQuoteUpdateCreated?.(intentText)
+        }}
+        onNavigateToEnrichQuoteUpdate={(intentText) => onNavigateToEnrichQuoteUpdate?.(intentText)}
+        enrichQuoteFlowActive={enrichQuoteFlowActive}
+        onTechnicalAttributesUpdateCreated={(intentText) => {
+          setBellNotification(true)
+          setNotificationPopoverOpen(true)
+          onTechnicalAttributesUpdateCreated?.(intentText)
+        }}
+        onNavigateToTechnicalAttributesUpdate={(intentText) => onNavigateToTechnicalAttributesUpdate?.(intentText)}
+        technicalAttributesPageActive={technicalAttributesPageActive}
+        onTechnicalAttributesToggleCompareWithAsset={onTechnicalAttributesToggleCompareWithAsset}
+        macdQuoteActive={macdQuoteActive}
+        onMacdUpgradeUpdateCreated={(intentText) => {
+          setBellNotification(true)
+          setNotificationPopoverOpen(true)
+          onMacdUpgradeUpdateCreated?.(intentText)
+        }}
+        onNavigateToMacdUpgradeUpdate={onNavigateToMacdUpgradeUpdate}
+        onMacdUpgradeUpdateAnalysisStart={onMacdUpgradeUpdateAnalysisStart}
         initialRestoreSnapshot={snapshotToPass}
         onPanelStateChange={(snapshot) => {
           panelStateRef.current = snapshot
@@ -637,6 +739,9 @@ function Header({ activeNavTab = 'Quote', onNavClick, selectedQuote = 'Quote 1',
             try {
               const payload = { isConversationView: snapshot.isConversationView, messages: snapshot.messages || [], hasNotification: snapshot.hasNotification ?? false, isPinned: snapshot.isPinned ?? false }
               localStorage.setItem(AGENTFORCE_CONVERSATION_SNAPSHOT_KEY, JSON.stringify(payload))
+              if (enrichQuoteFlowActive) {
+                localStorage.setItem(AGENTFORCE_ENRICH_QUOTE_RESTORE_KEY, JSON.stringify(payload))
+              }
             } catch (_) {}
           }
           if (effectiveRestoreKey && activeNavTab === 'Quote' && agentforcePanelOpen && snapshot) {

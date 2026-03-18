@@ -4,6 +4,7 @@
  */
 import { useState, useMemo, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
+import { useResizableColumns } from '../hooks/useResizableColumns'
 
 const PAGE_SIZE = 10
 const FILTER_ALL = 'All'
@@ -18,8 +19,8 @@ const BILLING_DISPATCH_METHODS = ['No Dispatch', 'CD', 'Paper-Center + E-mail', 
 const BILLING_MODES = ['Prepaid', 'Postpaid']
 const BILLING_PAYMENT_METHODS = ['NEFT', 'Card', 'Cheque', 'DD', 'RTGS']
 
-// 3 Billing Contact Person names shown across the list
-const BILLING_CONTACT_NAMES = ['Priya Sharma', 'Rahul Verma', 'Anita Krishnan']
+// 3 Billing Contact Person names shown across the list (with salutation)
+const BILLING_CONTACT_NAMES = ['Mrs. Priya Sharma', 'Mr. Rahul Verma', 'Mrs. Anita Krishnan']
 
 // Build line items from locations (from Summary/Locations continue). LSI shared across 2–3 rows for demo.
 function buildLineItemsFromQuote1(locations) {
@@ -176,7 +177,81 @@ const PO_SUB_COLUMNS = [
   { key: 'poOeReceivedDate', label: 'PO OE Received Date' },
 ]
 
-export default function SelectQuoteLineItemsPage({ onBack, quote1Locations = [], onTechnicalAttributesClick }) {
+const ENRICH_QUOTE_UPDATE_COLUMNS = {
+  poGroup: ['poGroupSummary', 'poNumber', 'poReceivedDate', 'poAmount', 'poExpiryDate', 'poExpiryType', 'poTerms', 'poOeReceivedDate'],
+  billing: ['billingDetailsSummary', 'billingLegalEntity', 'billingBillDetailsType', 'billingStore', 'billingFrequency', 'billingCreditPeriod', 'billingDispatchMethod', 'billingMode', 'billingPaymentMethod'],
+  bcp: ['billingContactPerson'],
+}
+
+function getEnrichQuoteUpdateColumnsForIntent(intentText) {
+  if (!intentText || typeof intentText !== 'string') return []
+  const t = intentText.toLowerCase().trim()
+  const cols = []
+  if (/\b(change|update|modify)\s+(technical\s+)?attributes?\b/.test(t) || /\b(technical\s+)?attributes?\s+(change|update|modify)\b/.test(t) || /\btechnical\s+attributes?\b/.test(t)) cols.push('productName')
+  if (/po\s*group|pogroup/.test(t)) cols.push(...ENRICH_QUOTE_UPDATE_COLUMNS.poGroup)
+  if (/billing\s*details|billingdetails/.test(t)) {
+    if (/legal\s*entity|legalentity/.test(t)) cols.push('billingLegalEntity')
+    else cols.push(...ENRICH_QUOTE_UPDATE_COLUMNS.billing)
+  }
+  if (/\bbcp\b/.test(t)) cols.push(...ENRICH_QUOTE_UPDATE_COLUMNS.bcp)
+  return [...new Set(cols)]
+}
+
+// Parse product filter from intent (e.g. "all Internet Products" -> "Internet", "SD WAN" -> "SD WAN")
+function getProductFilterFromIntent(intentText) {
+  if (!intentText || typeof intentText !== 'string') return null
+  const t = intentText.trim()
+  const products = ['Internet', 'SD WAN', 'MPLS', 'SDWAN']
+  for (const p of products) {
+    const re = new RegExp(`\\b${p.replace(/\s+/g, '\\s*')}\\b`, 'i')
+    if (re.test(t)) return p === 'SDWAN' ? 'SD WAN' : p
+  }
+  return null
+}
+
+// Parse Legal Entity value from intent (e.g. "to 'Bharti Airtel Ltd'" or "to Bharti Airtel Ltd" -> "Bharti Airtel Ltd")
+function getLegalEntityFromIntent(intentText) {
+  if (!intentText || typeof intentText !== 'string') return null
+  const m = intentText.match(/legal\s*entity\s+to\s+['"]([^'"]+)['"]/i) ||
+    intentText.match(/to\s+['"]([^'"]+)['"]\s*(?:for|to|in)/i) ||
+    intentText.match(/to\s+['"]([^'"]+)['"]/i) ||
+    intentText.match(/legal\s*entity[^t]*to\s+([A-Za-z][A-Za-z0-9\s.,\-]+(?:Ltd|Limited|SAS|LLC)?)\s*$/i) ||
+    intentText.match(/\bto\s+([A-Za-z][A-Za-z0-9\s.,\-]+(?:Ltd|Limited|SAS|LLC)?)\s*$/i)
+  return m ? m[1].trim() : null
+}
+
+// Parse LSI filter from intent (e.g. "all LSI 8026000047801" or "LSI 8026000047801" -> "8026000047801")
+function getLsiFilterFromIntent(intentText) {
+  if (!intentText || typeof intentText !== 'string') return null
+  const m = intentText.match(/\blsi\s+(\d{10,})/i) || intentText.match(/\b(\d{10,})\b/)
+  return m ? m[1].trim() : null
+}
+
+// Parse BCP value from intent (e.g. "to Rahul Verma" or "to 'Rahul Verma'" -> "Rahul Verma")
+function getBcpFromIntent(intentText) {
+  if (!intentText || typeof intentText !== 'string') return null
+  const m = intentText.match(/\bto\s+['"]([^'"]+)['"]/i) || intentText.match(/\bto\s+([A-Za-z][A-Za-z\s.-]+?)(?:\s+(?:for|in|all)|\s*$)/i)
+  return m ? m[1].trim() : null
+}
+
+// Parse Technical Attributes overrides from intent (e.g. "routing type to Static" -> { routingType: 'Static' })
+const ROUTING_TYPE_OPTIONS = ['Static', 'Private BGP', 'Static with Public BGP', 'Public BGP', 'Static with Private BGP', 'None']
+function getTechnicalAttributesOverridesFromIntent(intentText) {
+  if (!intentText || typeof intentText !== 'string') return null
+  const t = intentText.trim()
+  const overrides = {}
+  const routingTypeMatch = t.match(/\brouting\s+type\s+to\s+([A-Za-z][A-Za-z0-9\s\-]*(?:\s+[A-Za-z]+)*)/i)
+  if (routingTypeMatch) {
+    const val = routingTypeMatch[1].trim()
+    const match = ROUTING_TYPE_OPTIONS.find((opt) => opt.toLowerCase() === val.toLowerCase())
+    if (match) overrides.routingType = match
+  }
+  return Object.keys(overrides).length ? overrides : null
+}
+
+export { getTechnicalAttributesOverridesFromIntent }
+
+export default function SelectQuoteLineItemsPage({ onBack, quote1Locations = [], onTechnicalAttributesClick, enrichQuoteUpdateIntent, technicalAttributesConfiguredLocationIds }) {
   const [selectedIds, setSelectedIds] = useState(() => new Set())
   const [viewingSelectedOnly, setViewingSelectedOnly] = useState(false)
   const [deletedIds, setDeletedIds] = useState(() => new Set())
@@ -214,6 +289,7 @@ export default function SelectQuoteLineItemsPage({ onBack, quote1Locations = [],
   const invoiceShippingPopoverRef = useRef(null)
   const [addBcpModalOpen, setAddBcpModalOpen] = useState(false)
   const [addBcpApplyToSelected, setAddBcpApplyToSelected] = useState(true)
+  const [addBcpTargetIds, setAddBcpTargetIds] = useState([]) // row IDs to apply new BCP to when Save (from Add BCP flow)
   const [newBcpNames, setNewBcpNames] = useState([])
   const [bcpSalutation, setBcpSalutation] = useState('Mr.')
   const [bcpFirstName, setBcpFirstName] = useState('')
@@ -290,6 +366,17 @@ export default function SelectQuoteLineItemsPage({ onBack, quote1Locations = [],
   const rowMenuPortalRef = useRef(null)
   const bulkEditAnchorRef = useRef(null)
   const prevVisibleColumnKeysRef = useRef(null)
+  const enrichResizableCols = useMemo(() => [
+    ...COLUMNS.map((c) => ({ id: c.key, label: c.label })),
+    { id: 'billingDetails', label: BILLING_DETAILS_LABEL },
+    { id: 'poGroup', label: PO_GROUP_LABEL },
+    ...BILLING_SUB_COLUMNS.map((s) => ({ id: `billing_${s.key}`, label: s.label })),
+    ...PO_SUB_COLUMNS.map((s) => ({ id: `po_${s.key}`, label: s.label })),
+    { id: 'invoiceShippingDetails', label: INVOICE_SHIPPING_LABEL },
+    { id: 'gstApplicable', label: GST_APPLICABLE_LABEL },
+  ], [])
+  const { getColStyle, ResizeHandle } = useResizableColumns(enrichResizableCols)
+  const lastEnrichQuoteUpdateIntentRef = useRef(null)
 
   const getCellValue = (row, field) => cellEdits[row.id]?.[field] ?? row[field]
 
@@ -309,6 +396,15 @@ export default function SelectQuoteLineItemsPage({ onBack, quote1Locations = [],
 
   const showColumn = (key) => ALWAYS_VISIBLE_COLUMN_KEYS.includes(key) || visibleColumnKeys.size === 0 || visibleColumnKeys.has(key)
 
+  // Auto-expand Billing Details and PO Group when explicitly selected in Displaying dropdown (not when "All" is selected)
+  useEffect(() => {
+    const isFiltered = visibleColumnKeys.size > 0 && visibleColumnKeys.size < COLUMN_FILTER_KEYS.length
+    if (isFiltered) {
+      setBillingDetailsExpanded(visibleColumnKeys.has('billingDetails'))
+      setPoDetailsExpanded(visibleColumnKeys.has('poGroup'))
+    }
+  }, [visibleColumnKeys])
+
   const allLineItems = useMemo(
     () =>
       Array.isArray(quote1Locations) && quote1Locations.length > 0
@@ -316,6 +412,66 @@ export default function SelectQuoteLineItemsPage({ onBack, quote1Locations = [],
         : FALLBACK_LINE_ITEMS,
     [quote1Locations]
   )
+
+  // When navigating from PO Change/Update flow, apply updates and show Updated badge on relevant columns for affected rows only
+  useEffect(() => {
+    if (!enrichQuoteUpdateIntent) {
+      lastEnrichQuoteUpdateIntentRef.current = null
+      return
+    }
+    const cols = getEnrichQuoteUpdateColumnsForIntent(enrichQuoteUpdateIntent)
+    if (cols.length === 0) return
+    const productFilter = getProductFilterFromIntent(enrichQuoteUpdateIntent)
+    const lsiFilter = getLsiFilterFromIntent(enrichQuoteUpdateIntent)
+    const legalEntity = getLegalEntityFromIntent(enrichQuoteUpdateIntent)
+    const bcpValue = getBcpFromIntent(enrichQuoteUpdateIntent)
+    const rows = allLineItems.filter((r) => {
+      if (deletedIds.has(r.id)) return false
+      if (productFilter) {
+        const product = (cellEdits[r.id]?.productName ?? r.productName ?? '').toString().trim()
+        if (product.toLowerCase() !== productFilter.toLowerCase()) return false
+      }
+      if (lsiFilter) {
+        const lsi = (r.lsi ?? '').toString()
+        if (!lsi.startsWith(lsiFilter) && !lsi.includes(lsiFilter)) return false
+      }
+      return true
+    })
+    // Apply updates when intent specifies values - only once per intent (avoid re-applying on effect re-runs)
+    const isFirstApply = lastEnrichQuoteUpdateIntentRef.current !== enrichQuoteUpdateIntent
+    if (isFirstApply) {
+      if (legalEntity && cols.includes('billingLegalEntity')) {
+        setCellEdits((prev) => {
+          const next = { ...prev }
+          rows.forEach((r) => {
+            next[r.id] = { ...next[r.id], billingLegalEntity: legalEntity }
+          })
+          return next
+        })
+      }
+      if (bcpValue && cols.includes('billingContactPerson')) {
+        setCellEdits((prev) => {
+          const next = { ...prev }
+          rows.forEach((r) => {
+            next[r.id] = { ...next[r.id], billingContactPerson: bcpValue }
+          })
+          return next
+        })
+      }
+      lastEnrichQuoteUpdateIntentRef.current = enrichQuoteUpdateIntent
+    }
+    const keys = new Set(rows.flatMap((r) => cols.map((col) => cellKey(r.id, col))))
+    setLastUpdatedCells(keys)
+  }, [enrichQuoteUpdateIntent, allLineItems, deletedIds, cellEdits])
+
+  // When returning from Technical Attributes Save, show Updated badge on address and productName for configured locations
+  useEffect(() => {
+    if (!technicalAttributesConfiguredLocationIds || (technicalAttributesConfiguredLocationIds instanceof Set && technicalAttributesConfiguredLocationIds.size === 0)) return
+    const ids = technicalAttributesConfiguredLocationIds instanceof Set ? technicalAttributesConfiguredLocationIds : new Set(technicalAttributesConfiguredLocationIds || [])
+    const rows = allLineItems.filter((r) => !deletedIds.has(r.id) && ids.has(r.id))
+    const keys = new Set(rows.flatMap((r) => [cellKey(r.id, 'address'), cellKey(r.id, 'productName')]))
+    setLastUpdatedCells((prev) => new Set([...prev, ...keys]))
+  }, [technicalAttributesConfiguredLocationIds, allLineItems, deletedIds])
 
   const stateOptions = useMemo(() => {
     const states = [...new Set(allLineItems.map((r) => r.state).filter((s) => s && s !== '—'))].sort()
@@ -522,6 +678,8 @@ export default function SelectQuoteLineItemsPage({ onBack, quote1Locations = [],
       setBcpEndDate('')
       setBcpGstValidated(false)
       setValidateGstModalOpen(false)
+    } else {
+      setAddBcpTargetIds([])
     }
   }, [addBcpModalOpen])
 
@@ -663,19 +821,20 @@ export default function SelectQuoteLineItemsPage({ onBack, quote1Locations = [],
 
   return (
     <div className="flex flex-col min-h-0 flex-1">
-      {/* Header: Back to Quote + Enrich Quote title */}
+      {/* Header: Breadcrumbs Quote > Enrich Quote */}
       <div className="bg-screenshot-grey border border-gray-200 rounded-lg shadow-sm overflow-hidden mb-4">
         <div className="px-5 py-4 border-b border-gray-200">
-          <button
-            type="button"
-            onClick={onBack}
-            className="text-airtel-red text-xs font-medium hover:underline inline-flex items-center gap-1 mb-2"
-          >
-            <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clipRule="evenodd" />
-            </svg>
-            Back to Quote
-          </button>
+          <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 text-xs mb-2">
+            <button
+              type="button"
+              onClick={onBack}
+              className="text-airtel-red font-medium hover:underline"
+            >
+              Quote
+            </button>
+            <span className="text-gray-400" aria-hidden="true">&gt;</span>
+            <span className="text-gray-700 font-medium">Enrich Quote</span>
+          </nav>
           <h2 className="text-base font-semibold text-gray-900">Enrich Quote</h2>
         </div>
 
@@ -829,7 +988,18 @@ export default function SelectQuoteLineItemsPage({ onBack, quote1Locations = [],
 
         {/* Table */}
         <div className="overflow-x-auto flex flex-col min-h-0" style={{ minHeight: '20rem' }}>
-          <table className="w-full text-xs border-collapse">
+          <table className="w-full text-xs border-collapse table-fixed">
+            <colgroup>
+              <col className="w-10" />
+              {COLUMNS.filter((col) => showColumn(col.key)).map((col) => (
+                <col key={col.key} style={getColStyle(col.key)} />
+              ))}
+              {showColumn('billingDetails') && (billingDetailsExpanded ? BILLING_SUB_COLUMNS.map((s) => <col key={s.key} style={getColStyle(`billing_${s.key}`)} />) : <col style={getColStyle('billingDetails')} />)}
+              {showColumn('poGroup') && (poDetailsExpanded ? PO_SUB_COLUMNS.map((s) => <col key={s.key} style={getColStyle(`po_${s.key}`)} />) : <col style={getColStyle('poGroup')} />)}
+              {showColumn('invoiceShippingDetails') && <col style={getColStyle('invoiceShippingDetails')} />}
+              {showColumn('gstApplicable') && <col style={getColStyle('gstApplicable')} />}
+              <col className="w-8" />
+            </colgroup>
             <thead className="bg-gray-50">
               {/* Row 1: main column headers; Billing Details and PO Group are main columns (expand/collapse) */}
               <tr>
@@ -843,13 +1013,14 @@ export default function SelectQuoteLineItemsPage({ onBack, quote1Locations = [],
                   />
                 </th>
                 {COLUMNS.filter((col) => showColumn(col.key)).map((col) => (
-                  <th key={col.key} rowSpan={2} className="text-left font-medium text-gray-700 py-1 px-2 border-b border-r border-gray-200 whitespace-nowrap align-top">
+                  <th key={col.key} rowSpan={2} className="text-left font-medium text-gray-700 py-1 px-2 border-b border-r border-gray-200 whitespace-nowrap align-top group relative" style={getColStyle(col.key)}>
                     <span className="inline-flex items-center gap-0.5">
                       {col.label}
                       <svg className="w-3.5 h-3.5 text-gray-400" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
                         <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
                       </svg>
                     </span>
+                    <ResizeHandle columnId={col.key} />
                   </th>
                 ))}
                 {/* Billing Details: main column – collapsed = one column (rowSpan 2), expanded = colspan 9 in row 1 */}
@@ -857,7 +1028,8 @@ export default function SelectQuoteLineItemsPage({ onBack, quote1Locations = [],
                 <th
                   colSpan={billingDetailsExpanded ? 9 : 1}
                   rowSpan={billingDetailsExpanded ? 1 : 2}
-                  className={`text-left font-medium text-gray-700 py-1 px-2 border-b border-r border-gray-200 whitespace-nowrap align-top ${!billingDetailsExpanded ? 'w-[1%] max-w-[145px]' : ''}`}
+                  className={`text-left font-medium text-gray-700 py-1 px-2 border-b border-r border-gray-200 whitespace-nowrap align-top group relative ${!billingDetailsExpanded ? '' : ''}`}
+                  style={!billingDetailsExpanded ? getColStyle('billingDetails') : undefined}
                 >
                   <button
                     type="button"
@@ -872,6 +1044,7 @@ export default function SelectQuoteLineItemsPage({ onBack, quote1Locations = [],
                       <svg className="w-3.5 h-3.5 shrink-0" fill="currentColor" viewBox="0 0 20 20" title="Expand"><path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" /></svg>
                     )}
                   </button>
+                  {!billingDetailsExpanded && <ResizeHandle columnId="billingDetails" />}
                 </th>
                 )}
                 {/* PO Group: main column – collapsed = one column (rowSpan 2), expanded = colspan 6 in row 1 */}
@@ -879,7 +1052,8 @@ export default function SelectQuoteLineItemsPage({ onBack, quote1Locations = [],
                 <th
                   colSpan={poDetailsExpanded ? 7 : 1}
                   rowSpan={poDetailsExpanded ? 1 : 2}
-                  className={`text-left font-medium text-gray-700 py-1 px-2 border-b border-r border-gray-200 whitespace-nowrap align-top ${!poDetailsExpanded ? 'w-[1%] max-w-[110px]' : ''}`}
+                  className={`text-left font-medium text-gray-700 py-1 px-2 border-b border-r border-gray-200 whitespace-nowrap align-top group relative ${!poDetailsExpanded ? '' : ''}`}
+                  style={!poDetailsExpanded ? getColStyle('poGroup') : undefined}
                 >
                   <button
                     type="button"
@@ -894,16 +1068,19 @@ export default function SelectQuoteLineItemsPage({ onBack, quote1Locations = [],
                       <svg className="w-3.5 h-3.5 shrink-0" fill="currentColor" viewBox="0 0 20 20" title="Expand"><path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" /></svg>
                     )}
                   </button>
+                  {!poDetailsExpanded && <ResizeHandle columnId="poGroup" />}
                 </th>
                 )}
                 {showColumn('invoiceShippingDetails') && (
-                <th rowSpan={2} className="text-left font-medium text-gray-700 py-1 px-2 border-b border-r border-gray-200 whitespace-nowrap w-[11.5rem] max-w-[11.5rem] align-top">
+                <th rowSpan={2} className="text-left font-medium text-gray-700 py-1 px-2 border-b border-r border-gray-200 whitespace-nowrap align-top group relative" style={getColStyle('invoiceShippingDetails')}>
                   <span className="inline-flex items-center gap-0.5">{INVOICE_SHIPPING_LABEL}<svg className="w-3.5 h-3.5 text-gray-400 shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" /></svg></span>
+                  <ResizeHandle columnId="invoiceShippingDetails" />
                 </th>
                 )}
                 {showColumn('gstApplicable') && (
-                <th rowSpan={2} className="text-left font-medium text-gray-700 py-1 px-2 border-b border-r border-gray-200 whitespace-nowrap align-top">
+                <th rowSpan={2} className="text-left font-medium text-gray-700 py-1 px-2 border-b border-r border-gray-200 whitespace-nowrap align-top group relative" style={getColStyle('gstApplicable')}>
                   <span className="inline-flex items-center gap-0.5">{GST_APPLICABLE_LABEL}<svg className="w-3.5 h-3.5 text-gray-400" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" /></svg></span>
+                  <ResizeHandle columnId="gstApplicable" />
                 </th>
                 )}
                 <th rowSpan={2} className="text-left font-medium text-gray-700 py-1 px-2 border-b border-gray-200 w-8 align-top" aria-label="Actions" />
@@ -912,13 +1089,15 @@ export default function SelectQuoteLineItemsPage({ onBack, quote1Locations = [],
               {(billingDetailsExpanded || poDetailsExpanded) && (
                 <tr>
                   {showColumn('billingDetails') && billingDetailsExpanded && BILLING_SUB_COLUMNS.map((sub) => (
-                    <th key={sub.key} className="text-left font-medium text-gray-600 py-1.5 px-2 border-b border-r border-gray-200 whitespace-nowrap min-w-[90px] text-[11px]">
+                    <th key={sub.key} className="text-left font-medium text-gray-600 py-1.5 px-2 border-b border-r border-gray-200 whitespace-nowrap text-[11px] group relative" style={getColStyle(`billing_${sub.key}`)}>
                       <span>{sub.label}</span>
+                      <ResizeHandle columnId={`billing_${sub.key}`} />
                     </th>
                   ))}
                   {showColumn('poGroup') && poDetailsExpanded && PO_SUB_COLUMNS.map((sub) => (
-                    <th key={sub.key} className="text-left font-medium text-gray-600 py-1.5 px-2 border-b border-r border-gray-200 whitespace-nowrap min-w-[90px] text-[11px]">
+                    <th key={sub.key} className="text-left font-medium text-gray-600 py-1.5 px-2 border-b border-r border-gray-200 whitespace-nowrap text-[11px] group relative" style={getColStyle(`po_${sub.key}`)}>
                       <span>{sub.label}</span>
+                      <ResizeHandle columnId={`po_${sub.key}`} />
                     </th>
                   ))}
                 </tr>
@@ -939,7 +1118,14 @@ export default function SelectQuoteLineItemsPage({ onBack, quote1Locations = [],
                   {showColumn('lastEnrichedDate') && <td className="py-1 px-2 border-r border-gray-100">{row.lastEnrichedDate}</td>}
                   {showColumn('lsi') && <td className="py-1 px-2 border-r border-gray-100 truncate" title={row.lsi ?? '—'}>{row.lsi ?? '—'}</td>}
                   {showColumn('lineNumber') && <td className="py-1 px-2 border-r border-gray-100">{String(row.lineNumber).padStart(8, '0')}</td>}
-                  {showColumn('address') && <td className="py-1 px-2 border-r border-gray-100 max-w-[140px] truncate" title={row.address}>{row.address}</td>}
+                  {showColumn('address') && (
+                    <td className="py-1 px-2 border-r border-gray-100 max-w-[140px]">
+                      <div className="inline-flex items-center gap-1.5 min-w-0 max-w-full flex-wrap">
+                        <span className="truncate block" title={row.address}>{row.address}</span>
+                        {lastUpdatedCells.has(cellKey(row.id, 'address')) && UPDATED_BADGE}
+                      </div>
+                    </td>
+                  )}
                   {showColumn('state') && <td className="py-1 px-2 border-r border-gray-100">{row.state}</td>}
                   {showColumn('productName') && (
                   <td
@@ -1498,7 +1684,12 @@ export default function SelectQuoteLineItemsPage({ onBack, quote1Locations = [],
                 </div>
                 <button
                   type="button"
-                  onClick={() => { setAddBcpModalOpen(true); setEditingCell(null) }}
+                  onClick={() => {
+                    const ids = selectedIds.size >= 2 ? Array.from(selectedIds) : (editingCell?.rowId ? [editingCell.rowId] : [])
+                    setAddBcpTargetIds(ids)
+                    setAddBcpModalOpen(true)
+                    setEditingCell(null)
+                  }}
                   className="text-airtel-red text-xs font-medium underline hover:no-underline text-left"
                 >
                   + Add BCP
@@ -1613,7 +1804,14 @@ export default function SelectQuoteLineItemsPage({ onBack, quote1Locations = [],
             </div>
             <button
               type="button"
-              onClick={() => { setAddBcpModalOpen(true); setEditingCell(null); setBcpSearchQuery(''); setBcpPopoverPosition(null) }}
+              onClick={() => {
+                const ids = editingCell?.rowId ? [editingCell.rowId] : []
+                setAddBcpTargetIds(ids)
+                setAddBcpModalOpen(true)
+                setEditingCell(null)
+                setBcpSearchQuery('')
+                setBcpPopoverPosition(null)
+              }}
               className="text-airtel-red text-xs font-medium underline hover:no-underline text-left mt-2"
             >
               + Add BCP
@@ -1817,7 +2015,8 @@ export default function SelectQuoteLineItemsPage({ onBack, quote1Locations = [],
                       const billingChangedCols = Object.keys(updates).filter(
                         (col) => String(getCellValue(billingDetailsModalRow, col) ?? '') !== String(updates[col] ?? '')
                       )
-                      setLastUpdatedCells(new Set(ids.flatMap((id) => billingChangedCols.map((col) => cellKey(id, col)))))
+                      const billingKeys = billingChangedCols.length > 0 ? [...billingChangedCols, 'billingDetailsSummary'] : ['billingDetailsSummary']
+                      setLastUpdatedCells(new Set(ids.flatMap((id) => billingKeys.map((col) => cellKey(id, col)))))
                     }
                     setBillingDetailsModalRow(null)
                   }}
@@ -1932,7 +2131,8 @@ export default function SelectQuoteLineItemsPage({ onBack, quote1Locations = [],
                       const poChangedCols = Object.keys(updates).filter(
                         (col) => String(getCellValue(poGroupModalRow, col) ?? '') !== String(updates[col] ?? '')
                       )
-                      setLastUpdatedCells(new Set(ids.flatMap((id) => poChangedCols.map((col) => cellKey(id, col)))))
+                      const poKeys = poChangedCols.length > 0 ? [...poChangedCols, 'poGroupSummary'] : ['poGroupSummary']
+                      setLastUpdatedCells(new Set(ids.flatMap((id) => poKeys.map((col) => cellKey(id, col)))))
                     }
                     setPoGroupModalRow(null)
                   }}
@@ -2100,25 +2300,29 @@ export default function SelectQuoteLineItemsPage({ onBack, quote1Locations = [],
                   if (!(bcpCity || '').trim()) errors.city = true
                   if (!(bcpState || '').trim()) errors.state = true
                   if (!(bcpCountry || '').trim()) errors.country = true
-                  if (!(bcpGstApplicable || '').trim()) errors.gstApplicable = true
+                  // GST Applicable not required when Add GST is used and GST is validated
+                  if (!(bcpGstApplicable || '').trim() && !(bcpGstAdded && bcpGstValidated)) errors.gstApplicable = true
                   if (bcpGstAdded && !(bcpGstNumber || '').trim()) errors.gstNumber = true
                   setAddBcpValidationErrors(errors)
                   if (Object.keys(errors).length > 0) return
                   const name = [bcpSalutation, bcpFirstName, bcpLastName].filter(Boolean).join(' ').trim()
                   if (name) {
                     setNewBcpNames((prev) => [...prev, name])
-                    if (addBcpApplyToSelected && selectedIds.size >= 2) {
-                      const ids = Array.from(selectedIds)
+                    const idsToApply = addBcpTargetIds.length >= 2
+                      ? (addBcpApplyToSelected ? addBcpTargetIds : [])
+                      : addBcpTargetIds
+                    if (idsToApply.length > 0) {
                       setCellEdits((prev) => {
                         const next = { ...prev }
-                        ids.forEach((id) => {
+                        idsToApply.forEach((id) => {
                           next[id] = { ...next[id], billingContactPerson: name }
                         })
                         return next
                       })
-                      setLastUpdatedCells(new Set(ids.map((id) => cellKey(id, 'billingContactPerson'))))
+                      setLastUpdatedCells(new Set(idsToApply.map((id) => cellKey(id, 'billingContactPerson'))))
                     }
                   }
+                  setAddBcpTargetIds([])
                   setAddBcpModalOpen(false)
                 }}
                 className="px-3 py-1.5 rounded bg-airtel-red text-white text-xs font-medium"
@@ -2169,6 +2373,7 @@ export default function SelectQuoteLineItemsPage({ onBack, quote1Locations = [],
                 onClick={() => {
                   setValidateGstModalOpen(false)
                   setBcpGstValidated(true)
+                  setAddBcpValidationErrors((prev) => ({ ...prev, gstApplicable: false }))
                 }}
                 className="px-4 py-2 text-sm font-medium rounded-lg bg-airtel-red text-white hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-airtel-red focus:ring-offset-1"
               >

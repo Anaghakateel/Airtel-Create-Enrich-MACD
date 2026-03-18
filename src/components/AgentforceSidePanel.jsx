@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import agentforceIllustration from './agentforceillustration.png'
 import agentforceIcon from './AgentforceIcon.png'
+import { getOldValueForField } from '../data/technicalAttributesOldValues'
 
 const PANEL_MIN_WIDTH = 288
 const PANEL_MAX_WIDTH = 640
@@ -25,6 +26,18 @@ const VERIFY_DETAILS_ANALYSIS_STAGES = ['Working', 'Understanding your request',
 const ADD_PRODUCTS_ANALYSIS_STAGES = ['Working', 'Understanding your request', 'Identifying Next Steps', 'Finishing up']
 
 const UPDATE_CHANGE_ANALYSIS_STAGES = ['Working', 'Understanding your need', 'Identifying Next steps', 'Finishing Up']
+
+const PO_CHANGE_UPDATE_ANALYSIS_STAGES = ['Working', 'Understanding the requirement', 'Initiating the Steps', 'Finishing Up']
+const PO_CHANGE_UPDATE_RESPONSE_PREFIX = 'The changes are getting incorporated. It will take some time. See the updated changes here - '
+const PO_CHANGE_UPDATE_LINK_TEXT = 'Updated Enrich Quote'
+
+const TECHNICAL_ATTRIBUTES_UPDATE_ANALYSIS_STAGES = ['Working', 'Understanding the requirement', 'Initiating the Steps', 'Finishing Up']
+const TECHNICAL_ATTRIBUTES_UPDATE_RESPONSE_PREFIX = 'Technical attributes are getting updated. It will take some time. See the updated changes on the respective products - '
+const TECHNICAL_ATTRIBUTES_UPDATE_LINK_TEXT = 'Updated Technical Attributes for Enrich Quote'
+
+const MACD_UPGRADE_UPDATE_ANALYSIS_STAGES = ['Working', 'Understanding the requirement', 'Initiating the Steps', 'Finishing Up']
+const MACD_UPGRADE_UPDATE_RESPONSE_PREFIX = 'Sure. It will take some time to update the changes. See the updated changes here - '
+const MACD_UPGRADE_UPDATE_LINK_TEXT = 'Updates on the upgrade Quote for HDFC Bank'
 
 function getCreateQuoteCustomerName(text) {
   if (!text || typeof text !== 'string') return null
@@ -155,10 +168,72 @@ function isUpdateOrChangeIntent(text) {
   return /\bupdate\b/i.test(t) || /\bchange\b/i.test(t)
 }
 
+// Purchase Order Agentic Flow: Change/Update PO Group, Billing Details, or BCP
+const PO_CHANGE_UPDATE_PHRASES = [
+  'change po group',
+  'change billing details',
+  'change bcp',
+  'update po group',
+  'update billing details',
+  'update bcp',
+]
+function isPOChangeUpdateIntent(text) {
+  if (!text || typeof text !== 'string') return false
+  const t = text.trim().toLowerCase()
+  return PO_CHANGE_UPDATE_PHRASES.some((p) => t.includes(p))
+}
+
+function isTechnicalAttributesChangeIntent(text) {
+  if (!text || typeof text !== 'string') return false
+  const t = text.trim().toLowerCase()
+  return (
+    /\b(change|update|modify)\s+(technical\s+)?attributes?\b/.test(t) ||
+    /\b(technical\s+)?attributes?\s+(change|update|modify)\b/.test(t) ||
+    /\btechnical\s+attributes?\b/.test(t)
+  )
+}
+
 function isUpgradeAttributesIntent(text) {
   if (!text || typeof text !== 'string') return false
   const t = text.trim()
   return (/\bupgrade\b/i.test(t) && /\battributes?\b/i.test(t)) || /\bupgrade\s*attributes?\b/i.test(t)
+}
+
+// MACD Quote: "Update New Attributes", "Update New Media", "Change New Attributes", "Change New Media"
+function isMacdUpdateNewAttributesOrMediaIntent(text) {
+  if (!text || typeof text !== 'string') return false
+  const t = text.trim().toLowerCase()
+  const hasUpdateOrChange = /\b(update|change)\b/.test(t)
+  const hasNewAttributes = /\bnew\s+attributes?\b/.test(t)
+  const hasNewMedia = /\bnew\s+media\b/.test(t)
+  return hasUpdateOrChange && (hasNewAttributes || hasNewMedia)
+}
+
+// Technical Attributes: "Old Values" (no specific field) → toggle Compare with Asset only
+function isOldValuesToggleIntent(text) {
+  if (!text || typeof text !== 'string') return false
+  const t = text.trim().toLowerCase()
+  // Only match when NO field is mentioned – e.g. "old values", "show old values" without a field
+  if (/^old\s+values?\s*\.?$/.test(t)) return true
+  // "show/enable old values" but NOT followed by "for/of [field]"
+  if (/\b(show|enable|turn\s+on)\s+old\s+values?\s*\.?$/.test(t)) return true
+  return false
+}
+
+// Technical Attributes: "old value of/for [field]" → extract field name
+function getOldValueFieldFromIntent(text) {
+  if (!text || typeof text !== 'string') return null
+  const t = text.trim()
+  // "old value of [field]", "what is the old value of [field]"
+  const m1 = t.match(/(?:what\s+is\s+)?(?:the\s+)?old\s+values?\s+of\s+["']?([^"'?.]+)["']?\.?\s*$/i)
+  if (m1) return m1[1].trim()
+  // "old value for [field]", "show old value for [field]", "show old values for [field]"
+  const m2 = t.match(/(?:show\s+)?old\s+values?\s+for\s+["']?([^"'?.]+)["']?\.?\s*$/i)
+  if (m2) return m2[1].trim()
+  // "old value of [field]" (anywhere)
+  const m3 = t.match(/\bold\s+values?\s+of\s+["']?([^"'?.]+)["']?\.?\s*$/i)
+  if (m3) return m3[1].trim()
+  return null
 }
 
 function isYesIntent(text) {
@@ -209,6 +284,17 @@ function AgentforceSidePanel({
   onAddProductsAnalysisEnd,
   onUpgradeQuoteCreated,
   onNavigateToUpgradeQuote,
+  onEnrichQuoteUpdateCreated,
+  onNavigateToEnrichQuoteUpdate,
+  onPOChangeUpdateAnalysisStart,
+  enrichQuoteFlowActive = false,
+  technicalAttributesPageActive = false,
+  onTechnicalAttributesUpdateCreated,
+  onTechnicalAttributesToggleCompareWithAsset,
+  macdQuoteActive = false,
+  onMacdUpgradeUpdateCreated,
+  onNavigateToMacdUpgradeUpdate,
+  onMacdUpgradeUpdateAnalysisStart,
   initialRestoreSnapshot,
   onPanelStateChange,
 }) {
@@ -262,6 +348,78 @@ function AgentforceSidePanel({
         return
       }
       setMessages((prev) => prev.map((m) => (m.id === analyzingId ? { ...m, updateChangeStageIndex: step } : m)))
+      scrollToBottom()
+    }, 1500)
+  }
+
+  const macdUpgradeUpdateAnalyzingIntervalRef = useRef(null)
+  const startMacdUpgradeUpdateAnalysisFlow = (analyzingId, userText) => {
+    onMacdUpgradeUpdateAnalysisStart?.()
+    let step = 0
+    macdUpgradeUpdateAnalyzingIntervalRef.current = setInterval(() => {
+      step += 1
+      if (step >= 4) {
+        if (macdUpgradeUpdateAnalyzingIntervalRef.current) clearInterval(macdUpgradeUpdateAnalyzingIntervalRef.current)
+        macdUpgradeUpdateAnalyzingIntervalRef.current = null
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === analyzingId
+              ? { ...m, id: m.id, role: 'agent', text: MACD_UPGRADE_UPDATE_RESPONSE_PREFIX, showMacdUpgradeUpdateLink: true, macdUpgradeUpdateIntentText: userText, isMacdUpgradeUpdateAnalyzing: false }
+              : m
+          )
+        )
+        onMacdUpgradeUpdateCreated?.(userText)
+        return
+      }
+      setMessages((prev) => prev.map((m) => (m.id === analyzingId ? { ...m, macdUpgradeUpdateStageIndex: step } : m)))
+      scrollToBottom()
+    }, 1500)
+  }
+
+  const technicalAttributesUpdateAnalyzingIntervalRef = useRef(null)
+  const startTechnicalAttributesUpdateAnalysisFlow = (analyzingId, userText) => {
+    onPOChangeUpdateAnalysisStart?.()
+    let step = 0
+    technicalAttributesUpdateAnalyzingIntervalRef.current = setInterval(() => {
+      step += 1
+      if (step >= 4) {
+        if (technicalAttributesUpdateAnalyzingIntervalRef.current) clearInterval(technicalAttributesUpdateAnalyzingIntervalRef.current)
+        technicalAttributesUpdateAnalyzingIntervalRef.current = null
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === analyzingId
+              ? { ...m, id: m.id, role: 'agent', text: TECHNICAL_ATTRIBUTES_UPDATE_RESPONSE_PREFIX, showTechnicalAttributesUpdateLink: true, technicalAttributesUpdateIntentText: userText, isTechnicalAttributesUpdateAnalyzing: false }
+              : m
+          )
+        )
+        onTechnicalAttributesUpdateCreated?.(userText)
+        return
+      }
+      setMessages((prev) => prev.map((m) => (m.id === analyzingId ? { ...m, technicalAttributesUpdateStageIndex: step } : m)))
+      scrollToBottom()
+    }, 1500)
+  }
+
+  const poChangeUpdateAnalyzingIntervalRef = useRef(null)
+  const startPOChangeUpdateAnalysisFlow = (analyzingId, userText) => {
+    onPOChangeUpdateAnalysisStart?.()
+    let step = 0
+    poChangeUpdateAnalyzingIntervalRef.current = setInterval(() => {
+      step += 1
+      if (step >= 4) {
+        if (poChangeUpdateAnalyzingIntervalRef.current) clearInterval(poChangeUpdateAnalyzingIntervalRef.current)
+        poChangeUpdateAnalyzingIntervalRef.current = null
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === analyzingId
+              ? { ...m, id: m.id, role: 'agent', text: PO_CHANGE_UPDATE_RESPONSE_PREFIX, showEnrichQuoteUpdateLink: true, enrichQuoteUpdateIntentText: userText, isPOChangeUpdateAnalyzing: false }
+              : m
+          )
+        )
+        onEnrichQuoteUpdateCreated?.(userText)
+        return
+      }
+      setMessages((prev) => prev.map((m) => (m.id === analyzingId ? { ...m, poChangeUpdateStageIndex: step } : m)))
       scrollToBottom()
     }, 1500)
   }
@@ -456,7 +614,34 @@ function AgentforceSidePanel({
       setIsConversationView(true)
       const userMsg = { id: `user-${Date.now()}`, role: 'user', text }
       const prependIntro = showSalesAssistantStyle ? [SALES_ASSISTANT_INTRO_MSG] : []
-      if (isUpdateOrChangeIntent(text)) {
+      if (technicalAttributesPageActive) {
+        const field = getOldValueFieldFromIntent(text)
+        if (field) {
+          onTechnicalAttributesToggleCompareWithAsset?.()
+          const result = getOldValueForField(field)
+          const agentText = result ? `The old value of "${result.label}" is ${result.value}.` : `I couldn't find an old value for "${field}".`
+          setMessages([...prependIntro, userMsg, { id: `agent-${Date.now()}`, role: 'agent', text: agentText }])
+          return
+        }
+        if (isOldValuesToggleIntent(text)) {
+          onTechnicalAttributesToggleCompareWithAsset?.()
+          setMessages([...prependIntro, userMsg, { id: `agent-${Date.now()}`, role: 'agent', text: 'Compare with Asset has been enabled.' }])
+          return
+        }
+      }
+      if (macdQuoteActive && isMacdUpdateNewAttributesOrMediaIntent(text)) {
+        const analyzingId = `macd-upgrade-update-analyzing-${Date.now()}`
+        setMessages([...prependIntro, userMsg, { id: analyzingId, role: 'agent', isMacdUpgradeUpdateAnalyzing: true, macdUpgradeUpdateStageIndex: 0, macdUpgradeUpdateIntentText: text }])
+        startMacdUpgradeUpdateAnalysisFlow(analyzingId, text)
+      } else if (isTechnicalAttributesChangeIntent(text)) {
+        const analyzingId = `technical-attributes-update-analyzing-${Date.now()}`
+        setMessages([...prependIntro, userMsg, { id: analyzingId, role: 'agent', isTechnicalAttributesUpdateAnalyzing: true, technicalAttributesUpdateStageIndex: 0, technicalAttributesUpdateIntentText: text }])
+        startTechnicalAttributesUpdateAnalysisFlow(analyzingId, text)
+      } else if (isPOChangeUpdateIntent(text)) {
+        const analyzingId = `po-change-update-analyzing-${Date.now()}`
+        setMessages([...prependIntro, userMsg, { id: analyzingId, role: 'agent', isPOChangeUpdateAnalyzing: true, poChangeUpdateStageIndex: 0, enrichQuoteUpdateIntentText: text }])
+        startPOChangeUpdateAnalysisFlow(analyzingId, text)
+      } else if (isUpdateOrChangeIntent(text)) {
         const analyzingId = `update-change-analyzing-${Date.now()}`
         setMessages([...prependIntro, userMsg, { id: analyzingId, role: 'agent', isUpdateChangeAnalyzing: true, updateChangeStageIndex: 0, updateIntentText: text }])
         startUpdateChangeAnalysisFlow(analyzingId, text)
@@ -485,7 +670,7 @@ function AgentforceSidePanel({
         setMessages([...prependIntro, userMsg, { id: `agent-${Date.now()}`, role: 'agent', text: VALIDATE_QUOTE_RESPONSE_PREFIX, showValidatedQuoteLink: true }])
       } else if (isDOAIntent(text)) {
         setMessages([...prependIntro, userMsg, { id: `agent-${Date.now()}`, role: 'agent', text: DOA_RESPONSE }])
-      } else if (activeNavTab === 'Accounts' && isUpgradeAttributesIntent(text)) {
+      } else if (isUpgradeAttributesIntent(text)) {
         setMessages([...prependIntro, userMsg, { id: `agent-${Date.now()}`, role: 'agent', text: UPGRADE_ATTRIBUTES_RESPONSE, isUpgradeAttributesUploadQuestion: true }])
       } else if (isPOIntent(text)) {
         setMessages([...prependIntro, userMsg, { id: `agent-${Date.now()}`, role: 'agent', text: PO_AGENT_RESPONSE, isPOUploadQuestion: true }])
@@ -574,7 +759,46 @@ function AgentforceSidePanel({
     }
 
     const userMsg = { id: `user-${Date.now()}`, role: 'user', text }
+    if (technicalAttributesPageActive) {
+      const field = getOldValueFieldFromIntent(text)
+      if (field) {
+        onTechnicalAttributesToggleCompareWithAsset?.()
+        const result = getOldValueForField(field)
+        const agentText = result ? `The old value of "${result.label}" is ${result.value}.` : `I couldn't find an old value for "${field}".`
+        setMessages((prev) => [...prev, userMsg, { id: `agent-${Date.now()}`, role: 'agent', text: agentText }])
+        return
+      }
+      if (isOldValuesToggleIntent(text)) {
+        onTechnicalAttributesToggleCompareWithAsset?.()
+        setMessages((prev) => [...prev, userMsg, { id: `agent-${Date.now()}`, role: 'agent', text: 'Compare with Asset has been enabled.' }])
+        return
+      }
+    }
+    if (macdQuoteActive && isMacdUpdateNewAttributesOrMediaIntent(text)) {
+      const analyzingId = `macd-upgrade-update-analyzing-${Date.now()}`
+      setMessages((prev) => [...prev, userMsg, { id: analyzingId, role: 'agent', isMacdUpgradeUpdateAnalyzing: true, macdUpgradeUpdateStageIndex: 0, macdUpgradeUpdateIntentText: text }])
+      startMacdUpgradeUpdateAnalysisFlow(analyzingId, text)
+      return
+    }
+    if (enrichQuoteFlowActive && isTechnicalAttributesChangeIntent(text)) {
+      const analyzingId = `technical-attributes-update-analyzing-${Date.now()}`
+      setMessages((prev) => [...prev, userMsg, { id: analyzingId, role: 'agent', isTechnicalAttributesUpdateAnalyzing: true, technicalAttributesUpdateStageIndex: 0, technicalAttributesUpdateIntentText: text }])
+      startTechnicalAttributesUpdateAnalysisFlow(analyzingId, text)
+      return
+    }
     let agentMsg
+    if (isPOChangeUpdateIntent(text)) {
+      const analyzingId = `po-change-update-analyzing-${Date.now()}`
+      setMessages((prev) => [...prev, userMsg, { id: analyzingId, role: 'agent', isPOChangeUpdateAnalyzing: true, poChangeUpdateStageIndex: 0, enrichQuoteUpdateIntentText: text }])
+      startPOChangeUpdateAnalysisFlow(analyzingId, text)
+      return
+    }
+    if (isTechnicalAttributesChangeIntent(text)) {
+      const analyzingId = `technical-attributes-update-analyzing-${Date.now()}`
+      setMessages((prev) => [...prev, userMsg, { id: analyzingId, role: 'agent', isTechnicalAttributesUpdateAnalyzing: true, technicalAttributesUpdateStageIndex: 0, technicalAttributesUpdateIntentText: text }])
+      startTechnicalAttributesUpdateAnalysisFlow(analyzingId, text)
+      return
+    }
     if (isUpdateOrChangeIntent(text)) {
       const analyzingId = `update-change-analyzing-${Date.now()}`
       setMessages((prev) => [...prev, userMsg, { id: analyzingId, role: 'agent', isUpdateChangeAnalyzing: true, updateChangeStageIndex: 0, updateIntentText: text }])
@@ -714,6 +938,9 @@ function AgentforceSidePanel({
     return () => {
       if (quoteProposalAnalyzingIntervalRef.current) clearInterval(quoteProposalAnalyzingIntervalRef.current)
       if (upgradeAttributesAnalyzingIntervalRef.current) clearInterval(upgradeAttributesAnalyzingIntervalRef.current)
+      if (poChangeUpdateAnalyzingIntervalRef.current) clearInterval(poChangeUpdateAnalyzingIntervalRef.current)
+      if (technicalAttributesUpdateAnalyzingIntervalRef.current) clearInterval(technicalAttributesUpdateAnalyzingIntervalRef.current)
+      if (macdUpgradeUpdateAnalyzingIntervalRef.current) clearInterval(macdUpgradeUpdateAnalyzingIntervalRef.current)
     }
   }, [])
 
@@ -786,6 +1013,44 @@ function AgentforceSidePanel({
     }, 2500)
     return () => clearTimeout(t)
   }, [effectiveMessages, onAddProductsStatusShown])
+
+  // Fallback: if PO change/update analyzing is stuck at last stage, replace with final message and link
+  useEffect(() => {
+    const stuck = effectiveMessages.find((m) => m.role === 'agent' && m.isPOChangeUpdateAnalyzing === true && (m.poChangeUpdateStageIndex ?? 0) === 3)
+    if (!stuck) return
+    const id = stuck.id
+    const intentText = stuck.enrichQuoteUpdateIntentText
+    const t = setTimeout(() => {
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === id && m.isPOChangeUpdateAnalyzing
+            ? { ...m, text: PO_CHANGE_UPDATE_RESPONSE_PREFIX, showEnrichQuoteUpdateLink: true, enrichQuoteUpdateIntentText: intentText, isPOChangeUpdateAnalyzing: false }
+            : m
+        )
+      )
+      onEnrichQuoteUpdateCreated?.(intentText)
+    }, 2500)
+    return () => clearTimeout(t)
+  }, [effectiveMessages, onEnrichQuoteUpdateCreated])
+
+  // Fallback: if MACD upgrade update analyzing is stuck at last stage
+  useEffect(() => {
+    const stuck = effectiveMessages.find((m) => m.role === 'agent' && m.isMacdUpgradeUpdateAnalyzing === true && (m.macdUpgradeUpdateStageIndex ?? 0) === 3)
+    if (!stuck) return
+    const id = stuck.id
+    const intentText = stuck.macdUpgradeUpdateIntentText
+    const t = setTimeout(() => {
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === id && m.isMacdUpgradeUpdateAnalyzing
+            ? { ...m, text: MACD_UPGRADE_UPDATE_RESPONSE_PREFIX, showMacdUpgradeUpdateLink: true, macdUpgradeUpdateIntentText: intentText, isMacdUpgradeUpdateAnalyzing: false }
+            : m
+        )
+      )
+      onMacdUpgradeUpdateCreated?.(intentText)
+    }, 2500)
+    return () => clearTimeout(t)
+  }, [effectiveMessages, onMacdUpgradeUpdateCreated])
 
   // Fallback: if upgrade-attributes analyzing is stuck at last stage ("Finishing Up"), replace with final message and link
   useEffect(() => {
@@ -886,7 +1151,7 @@ function AgentforceSidePanel({
 
   return (
     <aside
-      className="fixed top-[7rem] right-0 bottom-0 bg-white border-l border-gray-200 shadow-xl z-50 flex flex-col min-h-0 overflow-hidden"
+      className="fixed top-[7rem] right-0 bottom-0 bg-white border-l border-gray-200 shadow-xl z-[60] flex flex-col min-h-0 overflow-hidden"
       style={{ width: panelWidth, maxWidth: '90vw' }}
       aria-label="Agentforce panel"
     >
@@ -1061,6 +1326,54 @@ function AgentforceSidePanel({
                             <span className="text-airtel-red underline">{UPGRADE_ATTRIBUTES_LINK_TEXT}</span>
                           )}
                         </p>
+                      ) : msg.isMacdUpgradeUpdateAnalyzing ? (
+                        <p className="text-sm text-gray-800">
+                          {MACD_UPGRADE_UPDATE_ANALYSIS_STAGES[msg.macdUpgradeUpdateStageIndex ?? 0]}
+                          <span className="inline-block ml-1 animate-pulse">...</span>
+                        </p>
+                      ) : msg.showMacdUpgradeUpdateLink ? (
+                        <p className="text-sm text-gray-800 whitespace-pre-line">
+                          {MACD_UPGRADE_UPDATE_RESPONSE_PREFIX}
+                          {onNavigateToMacdUpgradeUpdate ? (
+                            <button type="button" onClick={() => onNavigateToMacdUpgradeUpdate(msg.macdUpgradeUpdateIntentText)} className="text-airtel-red underline hover:text-red-800 focus:outline-none focus:underline">
+                              {MACD_UPGRADE_UPDATE_LINK_TEXT}
+                            </button>
+                          ) : (
+                            <span className="text-airtel-red underline">{MACD_UPGRADE_UPDATE_LINK_TEXT}</span>
+                          )}
+                        </p>
+                      ) : msg.isTechnicalAttributesUpdateAnalyzing ? (
+                        <p className="text-sm text-gray-800">
+                          {TECHNICAL_ATTRIBUTES_UPDATE_ANALYSIS_STAGES[msg.technicalAttributesUpdateStageIndex ?? 0]}
+                          <span className="inline-block ml-1 animate-pulse">...</span>
+                        </p>
+                      ) : msg.showTechnicalAttributesUpdateLink ? (
+                        <p className="text-sm text-gray-800 whitespace-pre-line">
+                          {TECHNICAL_ATTRIBUTES_UPDATE_RESPONSE_PREFIX}
+                          {onNavigateToEnrichQuoteUpdate ? (
+                            <button type="button" onClick={() => onNavigateToEnrichQuoteUpdate(msg.technicalAttributesUpdateIntentText)} className="text-airtel-red underline hover:text-red-800 focus:outline-none focus:underline">
+                              {TECHNICAL_ATTRIBUTES_UPDATE_LINK_TEXT}
+                            </button>
+                          ) : (
+                            <span className="text-airtel-red underline">{TECHNICAL_ATTRIBUTES_UPDATE_LINK_TEXT}</span>
+                          )}
+                        </p>
+                      ) : msg.isPOChangeUpdateAnalyzing ? (
+                        <p className="text-sm text-gray-800">
+                          {PO_CHANGE_UPDATE_ANALYSIS_STAGES[msg.poChangeUpdateStageIndex ?? 0]}
+                          <span className="inline-block ml-1 animate-pulse">...</span>
+                        </p>
+                      ) : msg.showEnrichQuoteUpdateLink ? (
+                        <p className="text-sm text-gray-800 whitespace-pre-line">
+                          {PO_CHANGE_UPDATE_RESPONSE_PREFIX}
+                          {onNavigateToEnrichQuoteUpdate ? (
+                            <button type="button" onClick={() => onNavigateToEnrichQuoteUpdate(msg.enrichQuoteUpdateIntentText)} className="text-airtel-red underline hover:text-red-800 focus:outline-none focus:underline">
+                              {PO_CHANGE_UPDATE_LINK_TEXT}
+                            </button>
+                          ) : (
+                            <span className="text-airtel-red underline">{PO_CHANGE_UPDATE_LINK_TEXT}</span>
+                          )}
+                        </p>
                       ) : msg.isUpdateChangeAnalyzing ? (
                         <p className="text-sm text-gray-800">
                           {UPDATE_CHANGE_ANALYSIS_STAGES[msg.updateChangeStageIndex ?? 0]}
@@ -1211,7 +1524,13 @@ function AgentforceSidePanel({
       )}
 
       <div className="shrink-0 p-4 bg-white border-t border-gray-200">
-        <div className="flex items-end gap-2 rounded-lg border border-gray-300 bg-white pl-3 pr-2 py-3 min-h-[4.5rem]">
+        <form
+          onSubmit={(e) => {
+            e.preventDefault()
+            sendChatMessage()
+          }}
+          className="flex items-end gap-2 rounded-lg border border-gray-300 bg-white pl-3 pr-2 py-3 min-h-[4.5rem]"
+        >
           <input
             type="text"
             value={chatInput}
@@ -1221,10 +1540,10 @@ function AgentforceSidePanel({
             className="flex-1 min-w-0 py-2 px-1 text-sm text-gray-800 placeholder-gray-500 focus:outline-none bg-transparent"
             aria-label="Chat input"
           />
-          <button type="button" onClick={() => sendChatMessage()} className="w-9 h-9 rounded-full flex items-center justify-center text-gray-600 hover:bg-grey-bg focus:outline-none shrink-0 mb-0.5" aria-label="Send message">
+          <button type="submit" className="w-9 h-9 rounded-full flex items-center justify-center text-gray-600 hover:bg-grey-bg focus:outline-none shrink-0 mb-0.5" aria-label="Send message">
             <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" /></svg>
           </button>
-        </div>
+        </form>
       </div>
     </aside>
   )

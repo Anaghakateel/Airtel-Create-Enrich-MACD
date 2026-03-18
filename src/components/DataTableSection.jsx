@@ -1,5 +1,6 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useMemo } from 'react'
 import { createPortal } from 'react-dom'
+import { useResizableColumns } from '../hooks/useResizableColumns'
 
 // 50 streets/roads/areas across India (used to build 2500 unique locations)
 const INDIAN_STREETS = [
@@ -65,6 +66,28 @@ function getCategoryForRequestedProduct(term) {
   if (!term) return MATCHED_PRODUCT_CATEGORIES[0]
   const category = REQUESTED_PRODUCT_TO_CATEGORY[term]
   return category ?? MATCHED_PRODUCT_CATEGORIES[0]
+}
+
+/** Parse intent text for product/category filter. Returns array of categories e.g. ['SD WAN'], or [] if none found (then badge shows on all rows). */
+function parseProductFilterFromIntent(intentText) {
+  if (!intentText || typeof intentText !== 'string') return []
+  const t = intentText.toLowerCase().trim()
+  const categories = []
+  if (/\b(?:all\s+)?(?:sd\s*[-]?\s*wan|sdwan)\b/.test(t)) categories.push('SD WAN')
+  if (/\b(?:all\s+)?mpls\b/.test(t)) categories.push('MPLS')
+  if (/\b(?:all\s+)?internet\b/.test(t)) categories.push('Internet')
+  return categories
+}
+
+/** Parse intent text for "from X to Y" attribute change. Returns { fromValue, toValue } or null. */
+function parseAttributeChangeFromIntent(intentText) {
+  if (!intentText || typeof intentText !== 'string') return null
+  const m = intentText.match(/\bfrom\s+(.+?)\s+to\s+(.+?)(?:\s*[.。]|$)/is)
+  if (!m) return null
+  const fromValue = m[1].replace(/^["']|["']$/g, '').trim()
+  const toValue = m[2].replace(/^["']|["']$/g, '').trim()
+  if (!fromValue || !toValue) return null
+  return { fromValue, toValue }
 }
 
 const CONFIDENCE_LEVEL_OPTIONS = [
@@ -458,6 +481,7 @@ function DataTableSection({
   const [isMatchLoading, setIsMatchLoading] = useState(false)
   const [lastUpdatedCells, setLastUpdatedCells] = useState(() => new Set()) // Set of 'rowId_column' – show UPDATED badge on these cells until next change
   const cellKey = (rowId, col) => `${rowId}_${col}`
+  const dataRowsRef = useRef([])
   const UPDATED_BADGE = (
     <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold text-black bg-white border border-gray-300 shrink-0" title="Updated">Updated</span>
   )
@@ -478,12 +502,43 @@ function DataTableSection({
   const searchAnchorRef = useRef(null)
   const selectAllCheckboxRef = useRef(null)
   const validationRowsRef = useRef([])
+  const dataTableResizableCols = useMemo(() => {
+    const base = [
+      { id: 'streetAddress', label: 'Street Address' },
+      { id: 'postalCode', label: 'Postal Code' },
+      { id: 'requestedProducts', label: 'Requested Products' },
+      { id: 'matchedProducts', label: 'Matched Products' },
+      { id: 'media', label: 'Media' },
+      { id: 'attributes', label: 'Attributes' },
+      { id: 'confidenceLevel', label: 'Confidence Level' },
+      { id: 'errorDetails', label: 'Error Details' },
+    ]
+    if (isMacdQuote) {
+      return [
+        { id: 'streetAddress', label: 'Street Address' },
+        { id: 'postalCode', label: 'Postal Code' },
+        { id: 'assetName', label: 'Asset Name' },
+        { id: 'lsi', label: 'LSI' },
+        { id: 'requestedProducts', label: 'Requested Products' },
+        { id: 'matchedProducts', label: 'Matched Products' },
+        { id: 'media', label: 'Old Media' },
+        { id: 'newMedia', label: 'New Media' },
+        { id: 'attributes', label: 'Old Attributes' },
+        { id: 'newAttributes', label: 'New Attributes' },
+        { id: 'confidenceLevel', label: 'Confidence Level' },
+        { id: 'errorDetails', label: 'Error Details' },
+      ]
+    }
+    return base
+  }, [isMacdQuote])
+  const { getColStyle, ResizeHandle } = useResizableColumns(dataTableResizableCols)
   const macdNewAttributesCache = useRef({}) // Persist newAttributes per row so they don't fluctuate on re-render
   const macdNewTechnologyCache = useRef({}) // Persist newTechnology per row for MACD New Media column
 
   const dataRows = ALL_ROWS.filter(
     (r) => !deletedIds.has(r.id) && !(continuedRecordIds && continuedRecordIds.has(r.id))
   )
+  dataRowsRef.current = dataRows
   const effectiveMatchResults = showMatchedResults ? matchResults : {}
   const dataRowsWithEdits = dataRows.map((row) => {
     const merged = { ...row, ...cellEdits[row.id], ...effectiveMatchResults[row.id] }
@@ -1033,10 +1088,49 @@ function DataTableSection({
         if (!rowIds || !rowIds.length) return
         setLastUpdatedCells(new Set(rowIds.map((id) => cellKey(id, 'matchedProducts'))))
       },
+      showMacdUpdatedBadgeForColumns: (columns, intentText) => {
+        if (!columns || !columns.length || !isMacdQuote) return
+        const rows = dataRowsRef.current || []
+        const targetCategories = parseProductFilterFromIntent(intentText)
+        const matchingRows = targetCategories.length > 0
+          ? rows.filter((r) => {
+              const reqCat = getCategoryForRequestedProduct(r.requestedProducts)
+              const matchCat = getCategoryForRequestedProduct(r.matchedProducts)
+              const cat = reqCat || matchCat
+              return targetCategories.some((c) => c === cat)
+            })
+          : rows
+        const rowIds = matchingRows.map((r) => r.id)
+        const cells = rowIds.flatMap((id) => columns.map((col) => cellKey(id, col)))
+        setLastUpdatedCells(new Set(cells))
+
+        // Apply newAttributes value changes when intent has "from X to Y"
+        if (columns.includes('newAttributes') && intentText) {
+          const change = parseAttributeChangeFromIntent(intentText)
+          if (change) {
+            const { fromValue, toValue } = change
+            setCellEdits((prev) => {
+              const next = { ...prev }
+              for (const row of matchingRows) {
+                const current = prev[row.id]?.newAttributes ?? getDifferentAttributesForProduct(row.attributes, row.requestedProducts)
+                if (!current) continue
+                const parts = current.split(',').map((s) => s.trim())
+                const newParts = parts.map((p) => (p.toLowerCase() === fromValue.toLowerCase() ? toValue : p))
+                const newStr = newParts.join(', ')
+                if (newStr !== current) {
+                  next[row.id] = { ...next[row.id], newAttributes: newStr }
+                  macdNewAttributesCache.current[row.id] = newStr
+                }
+              }
+              return next
+            })
+          }
+        }
+      },
       applyUpdateFromIntent,
     }
     return () => { quoteActionsRef.current = {} }
-  })
+  }, [isMacdQuote])
 
   const postalCodePopover =
     postalCodePopoverPosition &&
@@ -1745,9 +1839,25 @@ function DataTableSection({
             </div>
           )}
           <table className="w-full text-xs leading-tight table-fixed">
+            <colgroup>
+              <col className="w-10" />
+              <col style={getColStyle('streetAddress')} />
+              <col style={getColStyle('postalCode')} />
+              {isMacdQuote && <col style={getColStyle('assetName')} />}
+              {isMacdQuote && <col style={getColStyle('lsi')} />}
+              <col style={getColStyle('requestedProducts')} />
+              <col style={getColStyle('matchedProducts')} />
+              <col style={getColStyle('media')} />
+              {isMacdQuote && <col style={getColStyle('newMedia')} />}
+              <col style={getColStyle('attributes')} />
+              {isMacdQuote && <col style={getColStyle('newAttributes')} />}
+              <col style={getColStyle('confidenceLevel')} />
+              <col style={getColStyle('errorDetails')} />
+              <col className="w-9" />
+            </colgroup>
             <thead className="sticky top-0 z-10 bg-white">
               <tr className="bg-white border-b border-gray-200">
-                <th className="w-10 pl-4 pr-2 py-1 text-left">
+                <th className="w-10 pl-4 pr-2 py-1 text-left shrink-0">
                   <input
                     type="checkbox"
                     ref={selectAllCheckboxRef}
@@ -1763,11 +1873,11 @@ function DataTableSection({
                     aria-label="Select all"
                   />
                 </th>
-                <th className="w-40 px-2 py-1 text-left font-semibold text-gray-700 truncate text-xs" title="Street Address">Street Address</th>
-                <th className="w-24 px-2 py-1 text-left font-semibold text-gray-700 truncate text-xs" title="Postal Code">Postal Code</th>
-                {isMacdQuote && <th className="w-28 px-2 py-1 text-left font-semibold text-gray-700 truncate text-xs" title="Asset Name">Asset Name</th>}
-                {isMacdQuote && <th className="w-28 px-2 py-1 text-left font-semibold text-gray-700 truncate text-xs" title="LSI">LSI</th>}
-                <th className="w-28 px-2 py-1 text-left font-semibold text-gray-700 truncate text-xs" title="Requested Products">
+                <th className="px-2 py-1 text-left font-semibold text-gray-700 truncate text-xs group relative" title="Street Address" style={getColStyle('streetAddress')}><span className="block truncate">Street Address</span><ResizeHandle columnId="streetAddress" /></th>
+                <th className="px-2 py-1 text-left font-semibold text-gray-700 truncate text-xs group relative" title="Postal Code" style={getColStyle('postalCode')}><span className="block truncate">Postal Code</span><ResizeHandle columnId="postalCode" /></th>
+                {isMacdQuote && <th className="px-2 py-1 text-left font-semibold text-gray-700 truncate text-xs group relative" title="Asset Name" style={getColStyle('assetName')}><span className="block truncate">Asset Name</span><ResizeHandle columnId="assetName" /></th>}
+                {isMacdQuote && <th className="px-2 py-1 text-left font-semibold text-gray-700 truncate text-xs group relative" title="LSI" style={getColStyle('lsi')}><span className="block truncate">LSI</span><ResizeHandle columnId="lsi" /></th>}
+                <th className="px-2 py-1 text-left font-semibold text-gray-700 truncate text-xs group relative" title="Requested Products" style={getColStyle('requestedProducts')}>
                   <span className="inline-flex items-center gap-0.5 truncate max-w-full">
                     Requested Products
                     {viewByValue === 'Requested Products' && (
@@ -1788,9 +1898,10 @@ function DataTableSection({
                       </button>
                     )}
                   </span>
+                  <ResizeHandle columnId="requestedProducts" />
                 </th>
-                <th className="w-28 px-2 py-1 text-left font-semibold text-gray-700 truncate text-xs" title="Matched Products">Matched Products</th>
-                <th className="w-24 px-2 py-1 text-left font-semibold text-gray-700 truncate text-xs" title={isMacdQuote ? 'Old Media' : 'Media'}>
+                <th className="px-2 py-1 text-left font-semibold text-gray-700 truncate text-xs group relative" title="Matched Products" style={getColStyle('matchedProducts')}><span className="block truncate">Matched Products</span><ResizeHandle columnId="matchedProducts" /></th>
+                <th className="px-2 py-1 text-left font-semibold text-gray-700 truncate text-xs group relative" title={isMacdQuote ? 'Old Media' : 'Media'} style={getColStyle('media')}>
                   <span className="inline-flex items-center gap-0.5 truncate max-w-full">
                     {isMacdQuote ? 'Old Media' : 'Media'}
                     {viewByValue === 'Media' && (
@@ -1811,11 +1922,12 @@ function DataTableSection({
                       </button>
                     )}
                   </span>
+                  <ResizeHandle columnId="media" />
                 </th>
-                {isMacdQuote && <th className="w-24 px-2 py-1 text-left font-semibold text-gray-700 truncate text-xs" title="New Media">New Media</th>}
-                <th className="w-40 px-2 py-1 text-left font-semibold text-gray-700 truncate text-xs" title={isMacdQuote ? 'Old Attributes' : 'Attributes'}>{isMacdQuote ? 'Old Attributes' : 'Attributes'}</th>
-                {isMacdQuote && <th className="w-40 px-2 py-1 text-left font-semibold text-gray-700 truncate text-xs" title="New Attributes">New Attributes</th>}
-                <th className="w-24 px-2 py-1 text-left font-semibold text-gray-700 truncate text-xs" title="Confidence Level">
+                {isMacdQuote && <th className="px-2 py-1 text-left font-semibold text-gray-700 truncate text-xs group relative" title="New Media" style={getColStyle('newMedia')}><span className="block truncate">New Media</span><ResizeHandle columnId="newMedia" /></th>}
+                <th className="px-2 py-1 text-left font-semibold text-gray-700 truncate text-xs group relative" title={isMacdQuote ? 'Old Attributes' : 'Attributes'} style={getColStyle('attributes')}><span className="block truncate">{isMacdQuote ? 'Old Attributes' : 'Attributes'}</span><ResizeHandle columnId="attributes" /></th>
+                {isMacdQuote && <th className="px-2 py-1 text-left font-semibold text-gray-700 truncate text-xs group relative" title="New Attributes" style={getColStyle('newAttributes')}><span className="block truncate">New Attributes</span><ResizeHandle columnId="newAttributes" /></th>}
+                <th className="px-2 py-1 text-left font-semibold text-gray-700 truncate text-xs group relative" title="Confidence Level" style={getColStyle('confidenceLevel')}>
                   <span className="inline-flex items-center gap-0.5 truncate max-w-full">
                     Confidence Level
                     <button
@@ -1837,9 +1949,10 @@ function DataTableSection({
                       </svg>
                     </button>
                   </span>
+                  <ResizeHandle columnId="confidenceLevel" />
                 </th>
-                <th className="w-32 px-2 py-1 text-left font-semibold text-gray-700 truncate text-xs" title="Error Details">Error Details</th>
-                <th className="w-9 px-2 py-1" aria-label="Row actions" />
+                <th className="px-2 py-1 text-left font-semibold text-gray-700 truncate text-xs group relative" title="Error Details" style={getColStyle('errorDetails')}><span className="block truncate">Error Details</span><ResizeHandle columnId="errorDetails" /></th>
+                <th className="w-9 px-2 py-1 shrink-0" aria-label="Row actions" />
               </tr>
             </thead>
             <tbody>

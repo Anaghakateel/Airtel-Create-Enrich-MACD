@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
+import { useResizableColumns } from '../hooks/useResizableColumns'
 
 const PRODUCTS = ['Internet', 'SD WAN', 'MPLS']
 const FEASIBILITY_STATUSES = ['Progress', 'Complete', 'Failure']
@@ -135,6 +136,26 @@ function SummaryTabContent({ locations = [], onTotalsChange, onEditRow, showFeas
   const errorPopoverAnchorRef = useRef(null)
   const errorPopoverCloseTimeoutRef = useRef(null)
   const selectAllCheckboxRef = useRef(null)
+  const summaryResizableCols = useMemo(() => [
+    { id: 'memberGroup', label: 'Member/Group' },
+    { id: 'siteFloor', label: 'Site Floor' },
+    { id: 'media', label: 'Media' },
+    { id: 'maxBandwidth', label: 'Max Bandwidth' },
+    { id: 'tax', label: 'Tax' },
+    { id: 'erpStatus', label: 'ERP Status' },
+    { id: 'quantity', label: 'Quantity' },
+    { id: 'product', label: 'Product' },
+    { id: 'itemCode', label: 'Item Code' },
+    { id: 'arcTotal', label: 'ARC Total' },
+    { id: 'feasibilityStatus', label: 'Feasibility Status' },
+    { id: 'crossConnect', label: 'Cross Connect' },
+    { id: 'circuitId', label: 'Circuit Id' },
+    { id: 'changeRequest', label: 'Change Request' },
+    { id: 'subActivity', label: 'Sub Activity' },
+    { id: 'recurringTotal', label: 'Recurring' },
+    { id: 'oneTimeTotal', label: 'One Time' },
+  ], [])
+  const { getColStyle, ResizeHandle } = useResizableColumns(summaryResizableCols)
 
   useEffect(() => {
     return () => {
@@ -397,9 +418,14 @@ function SummaryTabContent({ locations = [], onTotalsChange, onEditRow, showFeas
       <div className="overflow-x-auto flex flex-col min-h-0" style={{ height: '24rem' }}>
         <div className="overflow-y-auto border-b border-gray-100 min-h-0" style={{ height: '22rem' }}>
           <table className="w-full text-xs leading-tight table-fixed">
+            <colgroup>
+              <col className="w-10" />
+              {summaryResizableCols.map((c) => <col key={c.id} style={getColStyle(c.id)} />)}
+              <col className="w-9" />
+            </colgroup>
             <thead className="sticky top-0 z-10 bg-gray-100">
               <tr className="border-b border-gray-200">
-                <th className="w-10 pl-4 pr-2 py-3 text-left">
+                <th className="w-10 pl-4 pr-2 py-3 text-left shrink-0">
                   <input
                     ref={selectAllCheckboxRef}
                     type="checkbox"
@@ -420,24 +446,24 @@ function SummaryTabContent({ locations = [], onTotalsChange, onEditRow, showFeas
                     }}
                   />
                 </th>
-                <th className="min-w-[6rem] px-2 py-3 text-left font-semibold text-gray-900 text-xs truncate">Member/Group</th>
-                <th className="w-20 px-2 py-3 text-left font-semibold text-gray-900 text-xs truncate">Site Floor</th>
-                <th className="w-16 px-2 py-3 text-left font-semibold text-gray-900 text-xs truncate">Media</th>
-                <th className="w-20 px-2 py-3 text-left font-semibold text-gray-900 text-xs truncate">Max Bandwidth</th>
-                <th className="w-14 px-2 py-3 text-left font-semibold text-gray-900 text-xs truncate">Tax</th>
-                <th className="w-20 px-2 py-3 text-left font-semibold text-gray-900 text-xs truncate">ERP Status</th>
-                <th className="w-16 px-2 py-3 text-left font-semibold text-gray-900 text-xs truncate">Quantity</th>
-                <th className="min-w-[5rem] px-2 py-3 text-left font-semibold text-gray-900 text-xs truncate">Product</th>
-                <th className="w-20 px-2 py-3 text-left font-semibold text-gray-900 text-xs truncate">Item Code</th>
-                <th className="w-24 px-2 py-3 text-left font-semibold text-gray-900 text-xs truncate">ARC Total</th>
-                <th className="w-20 px-2 py-3 text-left font-semibold text-gray-900 text-xs truncate">Feasibility Status</th>
-                <th className="w-20 px-2 py-3 text-left font-semibold text-gray-900 text-xs truncate">Cross Connect</th>
-                <th className="w-20 px-2 py-3 text-left font-semibold text-gray-900 text-xs truncate">Circuit Id</th>
-                <th className="w-24 px-2 py-3 text-left font-semibold text-gray-900 text-xs truncate">Change Request</th>
-                <th className="w-24 px-2 py-3 text-left font-semibold text-gray-900 text-xs truncate">Sub Activity</th>
-                <th className="w-20 px-2 py-3 text-left font-semibold text-gray-900 text-xs truncate">Recurring</th>
-                <th className="w-20 px-2 py-3 text-left font-semibold text-gray-900 text-xs truncate">One Time</th>
-                <th className="w-9 px-2 py-3" aria-label="Row actions" />
+                <th className="px-2 py-3 text-left font-semibold text-gray-900 text-xs truncate group relative" style={getColStyle('memberGroup')}><span className="block truncate">Member/Group</span><ResizeHandle columnId="memberGroup" /></th>
+                <th className="px-2 py-3 text-left font-semibold text-gray-900 text-xs truncate group relative" style={getColStyle('siteFloor')}><span className="block truncate">Site Floor</span><ResizeHandle columnId="siteFloor" /></th>
+                <th className="px-2 py-3 text-left font-semibold text-gray-900 text-xs truncate group relative" style={getColStyle('media')}><span className="block truncate">Media</span><ResizeHandle columnId="media" /></th>
+                <th className="px-2 py-3 text-left font-semibold text-gray-900 text-xs truncate group relative" style={getColStyle('maxBandwidth')}><span className="block truncate">Max Bandwidth</span><ResizeHandle columnId="maxBandwidth" /></th>
+                <th className="px-2 py-3 text-left font-semibold text-gray-900 text-xs truncate group relative" style={getColStyle('tax')}><span className="block truncate">Tax</span><ResizeHandle columnId="tax" /></th>
+                <th className="px-2 py-3 text-left font-semibold text-gray-900 text-xs truncate group relative" style={getColStyle('erpStatus')}><span className="block truncate">ERP Status</span><ResizeHandle columnId="erpStatus" /></th>
+                <th className="px-2 py-3 text-left font-semibold text-gray-900 text-xs truncate group relative" style={getColStyle('quantity')}><span className="block truncate">Quantity</span><ResizeHandle columnId="quantity" /></th>
+                <th className="px-2 py-3 text-left font-semibold text-gray-900 text-xs truncate group relative" style={getColStyle('product')}><span className="block truncate">Product</span><ResizeHandle columnId="product" /></th>
+                <th className="px-2 py-3 text-left font-semibold text-gray-900 text-xs truncate group relative" style={getColStyle('itemCode')}><span className="block truncate">Item Code</span><ResizeHandle columnId="itemCode" /></th>
+                <th className="px-2 py-3 text-left font-semibold text-gray-900 text-xs truncate group relative" style={getColStyle('arcTotal')}><span className="block truncate">ARC Total</span><ResizeHandle columnId="arcTotal" /></th>
+                <th className="px-2 py-3 text-left font-semibold text-gray-900 text-xs truncate group relative" style={getColStyle('feasibilityStatus')}><span className="block truncate">Feasibility Status</span><ResizeHandle columnId="feasibilityStatus" /></th>
+                <th className="px-2 py-3 text-left font-semibold text-gray-900 text-xs truncate group relative" style={getColStyle('crossConnect')}><span className="block truncate">Cross Connect</span><ResizeHandle columnId="crossConnect" /></th>
+                <th className="px-2 py-3 text-left font-semibold text-gray-900 text-xs truncate group relative" style={getColStyle('circuitId')}><span className="block truncate">Circuit Id</span><ResizeHandle columnId="circuitId" /></th>
+                <th className="px-2 py-3 text-left font-semibold text-gray-900 text-xs truncate group relative" style={getColStyle('changeRequest')}><span className="block truncate">Change Request</span><ResizeHandle columnId="changeRequest" /></th>
+                <th className="px-2 py-3 text-left font-semibold text-gray-900 text-xs truncate group relative" style={getColStyle('subActivity')}><span className="block truncate">Sub Activity</span><ResizeHandle columnId="subActivity" /></th>
+                <th className="px-2 py-3 text-left font-semibold text-gray-900 text-xs truncate group relative" style={getColStyle('recurringTotal')}><span className="block truncate">Recurring</span><ResizeHandle columnId="recurringTotal" /></th>
+                <th className="px-2 py-3 text-left font-semibold text-gray-900 text-xs truncate group relative" style={getColStyle('oneTimeTotal')}><span className="block truncate">One Time</span><ResizeHandle columnId="oneTimeTotal" /></th>
+                <th className="w-9 px-2 py-3 shrink-0" aria-label="Row actions" />
               </tr>
             </thead>
             <tbody>

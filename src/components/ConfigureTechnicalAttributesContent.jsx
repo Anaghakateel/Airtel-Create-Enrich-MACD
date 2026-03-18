@@ -2,7 +2,7 @@
  * Configure Technical Attributes form - sections:
  * Account & Order Details, Internet, Primary Link, Connectivity IP Block, Connectivity LAN IP, Connectivity WAN IP
  */
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 
 const SELECT_OPTION = 'Select an Option'
 
@@ -118,8 +118,11 @@ function FieldDate({ defaultValue = '', disabled }) {
   )
 }
 
-export default function ConfigureTechnicalAttributesContent({ onDirtyChange, compareWithAsset }) {
-  const [routingType, setRoutingType] = useState('')
+export default function ConfigureTechnicalAttributesContent({ onDirtyChange, compareWithAsset, technicalAttributesOverrides }) {
+  const [routingType, setRoutingType] = useState(technicalAttributesOverrides?.routingType ?? '')
+  useEffect(() => {
+    if (technicalAttributesOverrides?.routingType) setRoutingType(technicalAttributesOverrides.routingType)
+  }, [technicalAttributesOverrides])
   const gridClass = 'grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-x-4 gap-y-3 text-xs'
   const isStaticRouting = routingType === 'Static'
 
