@@ -63,6 +63,7 @@ function App() {
   const [locationsForSummaryTab, setLocationsForSummaryTab] = useState([]) // populated only when user clicks Continue on Locations tab
   const [summaryTotals, setSummaryTotals] = useState({ oneTimeTotal: 0, monthlyTotal: 0, quoteTotal: 0 })
   const [editingSummaryRow, setEditingSummaryRow] = useState(null) // when set, show Configuration Cart sub-tab
+  const [selectedSummaryRowIdsForConfig, setSelectedSummaryRowIdsForConfig] = useState(() => new Set()) // row ids selected when Edit opened; used for Add Configurations to apply to all selected
   const [configUpdateInProgress, setConfigUpdateInProgress] = useState(false) // loading when "Add products to locations" is clicked
   const [summaryUpdatedProductHighlight, setSummaryUpdatedProductHighlight] = useState(null) // legacy, kept for compat
   const [summaryUpdatedProductRowIds, setSummaryUpdatedProductRowIds] = useState(() => new Set()) // row ids to show Updated badge in Product/Member-Group after Add configurations to quote
@@ -681,17 +682,27 @@ function App() {
                   <div className="relative flex-1 min-h-0 flex flex-col">
                     <ConfigurationCartView
                       row={editingSummaryRow}
+                      selectedRowIds={selectedSummaryRowIdsForConfig}
                       onBack={() => {
                         setEditingSummaryRow(null)
+                        setSelectedSummaryRowIdsForConfig(new Set())
                         setActiveTab('Summary')
                       }}
                       onAddProductsToQuote={(selectedLocationIds = []) => {
-                        pendingConfigRef.current = { ids: selectedLocationIds, count: selectedLocationIds.length }
-                        setSummaryUpdatedProductRowIds((prev) => new Set([...prev, ...selectedLocationIds]))
+                        const ids = Array.isArray(selectedLocationIds) ? selectedLocationIds : []
+                        if (ids.length === 0) return
+                        pendingConfigRef.current = { ids, count: ids.length }
+                        setConfigUpdateInProgress(true)
+                        setSummaryUpdatedProductRowIds((prev) => new Set([...prev, ...ids]))
                         setEditingSummaryRow(null)
+                        setSelectedSummaryRowIdsForConfig(new Set())
                         setActiveTab('Summary')
                         setConfigToQuoteOverlayVisible(true)
                         setUpdatedConfigurationsToQuoteNotification(true)
+                        setTimeout(() => {
+                          setConfigUpdateInProgress(false)
+                          setConfigToQuoteOverlayVisible(false)
+                        }, 1800)
                       }}
                       locations={
                       editingSummaryRow?.product === 'Internet'
@@ -734,7 +745,10 @@ function App() {
                     <SummaryTabContent
                       locations={locationsForSummaryTab}
                       onTotalsChange={setSummaryTotals}
-                      onEditRow={setEditingSummaryRow}
+                      onEditRow={(row, selectedIds) => {
+                        setEditingSummaryRow(row)
+                        setSelectedSummaryRowIdsForConfig(selectedIds instanceof Set ? selectedIds : new Set(selectedIds || []))
+                      }}
                       showFeasibilityEmptyInitially={summaryFeasibilityEmptyInitially}
                       updatedProductHighlight={summaryUpdatedProductHighlight}
                       updatedProductRowIds={summaryUpdatedProductRowIds}

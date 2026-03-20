@@ -20,10 +20,14 @@ const ERROR_SUMMARY_MESSAGES = [
 ]
 const INTERNET_CONFIG_ERROR_MESSAGE = 'Certain configuration mandatory attributes are missing.'
 
+const MAX_INTERNET_CONFIG_ERRORS = 8
+
 // Build summary rows from locations: mix of Internet, SD WAN, MPLS; random rows get Failure + error.
+// Only first MAX_INTERNET_CONFIG_ERRORS Internet products show config error badge.
 // When useFeasibilityResults is true, feasibilityStatus is one of Success, Partial, Failure (for post–Check Feasibility view).
 export function buildSummaryRows(locations, useFeasibilityResults = false) {
   if (!locations || locations.length === 0) return []
+  let internetConfigErrorCount = 0
   const rows = locations.map((loc, i) => {
     const product = PRODUCTS[i % PRODUCTS.length]
     const oneTime = 10000 + Math.floor(Math.random() * 150000)
@@ -34,6 +38,8 @@ export function buildSummaryRows(locations, useFeasibilityResults = false) {
           const isFailure = Math.random() < 0.2
           return isFailure ? 'Failure' : FEASIBILITY_STATUSES[Math.floor(Math.random() * 2)]
         })()
+    const showInternetConfigError = product === 'Internet' && internetConfigErrorCount < MAX_INTERNET_CONFIG_ERRORS
+    if (showInternetConfigError) internetConfigErrorCount += 1
     const row = {
       id: loc.id,
       memberGroup: loc.streetAddress || loc.city || '—',
@@ -45,6 +51,7 @@ export function buildSummaryRows(locations, useFeasibilityResults = false) {
       quantity: 1,
       product,
       productDisplay: product,
+      showInternetConfigError: showInternetConfigError || false,
       itemCode: '—',
       arcTotal,
       feasibilityStatus,
@@ -126,6 +133,7 @@ function SummaryTabContent({ locations = [], onTotalsChange, onEditRow, showFeas
   const [applyDeleteToSelectedRows, setApplyDeleteToSelectedRows] = useState(false)
   const [selectedIds, setSelectedIds] = useState(() => new Set())
   const searchAnchorRef = useRef(null)
+  const productFilterRef = useRef(null)
   const menuAnchorRef = useRef(null)
   const [filterByOpen, setFilterByOpen] = useState(false)
   const [productFilter, setProductFilter] = useState(null)
@@ -187,8 +195,32 @@ function SummaryTabContent({ locations = [], onTotalsChange, onEditRow, showFeas
     return () => document.removeEventListener('click', handleClickOutside)
   }, [showSearchSuggestions])
 
+  // Close product filter dropdown when clicking outside
+  useEffect(() => {
+    if (!productDropdownOpen) return
+    const handleClickOutside = (e) => {
+      if (productFilterRef.current && !productFilterRef.current.contains(e.target)) {
+        setProductDropdownOpen(false)
+      }
+    }
+    document.addEventListener('click', handleClickOutside)
+    return () => document.removeEventListener('click', handleClickOutside)
+  }, [productDropdownOpen])
+
+  // Reset to page 1 when product filter changes
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [productFilter])
+
   let rowsToDisplay = summaryRows.filter((r) => !deletedIds.has(r.id))
   if (showFeasibilityErrorOnly) rowsToDisplay = rowsToDisplay.filter((r) => r.feasibilityStatus === 'Failure')
+  if (productFilter != null) {
+    if (productFilter === 'Error') {
+      rowsToDisplay = rowsToDisplay.filter((r) => r.feasibilityStatus === 'Failure')
+    } else {
+      rowsToDisplay = rowsToDisplay.filter((r) => r.product === productFilter)
+    }
+  }
 
   const searchSuggestions = useMemo(() => {
     const q = searchInput.trim().toLowerCase()
@@ -283,6 +315,28 @@ function SummaryTabContent({ locations = [], onTotalsChange, onEditRow, showFeas
               <path fillRule="evenodd" d="M5.293 7.293a1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
             </svg>
           </button>
+          <span className="text-xs text-gray-600">Filter by Product</span>
+          <div className="relative" ref={productFilterRef}>
+            <button
+              type="button"
+              onClick={() => setProductDropdownOpen((o) => !o)}
+              className="inline-flex items-center gap-1 px-3 py-1.5 border border-gray-300 rounded-md bg-white text-xs text-gray-700 hover:bg-grey-bg/50"
+              aria-expanded={productDropdownOpen}
+            >
+              {productFilter == null ? 'All Products' : productFilter}
+              <svg className="w-4 h-4 text-gray-500" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M5.293 7.293a1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+              </svg>
+            </button>
+            {productDropdownOpen && (
+              <div className="absolute left-0 top-full mt-1 z-30 min-w-[8rem] py-1 bg-white border border-gray-200 rounded-md shadow-lg">
+                <button type="button" onClick={() => { setProductFilter(null); setProductDropdownOpen(false) }} className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-grey-bg">All Products</button>
+                {PRODUCTS.map((p) => (
+                  <button key={p} type="button" onClick={() => { setProductFilter(p); setProductDropdownOpen(false) }} className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-grey-bg">{p}</button>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <div className="relative" aria-hidden>
@@ -406,6 +460,7 @@ function SummaryTabContent({ locations = [], onTotalsChange, onEditRow, showFeas
         <p className="text-gray-600">
           Showing {totalRows === 0 ? '0' : (currentPage - 1) * PAGE_SIZE + 1} - {totalRows === 0 ? '0' : Math.min(currentPage * PAGE_SIZE, totalRows)} of {rowsToDisplay.length} records.
           {showFeasibilityErrorOnly && <span> • Showing only records with feasibility error</span>}
+          {productFilter != null && <span> • Product: {productFilter}</span>}
           {searchFilter != null && String(searchFilter).trim() !== '' && <span> • Matching search</span>}
         </p>
         {showFeasibilityErrorOnly ? (
@@ -504,7 +559,7 @@ function SummaryTabContent({ locations = [], onTotalsChange, onEditRow, showFeas
                     <span className="inline-flex items-center gap-1 min-w-0">
                       {(() => {
                         const hasFeasibilityError = row.feasibilityStatus === 'Failure'
-                        const hasInternetConfigError = row.product === 'Internet' && !updatedRowIdsSet.has(row.id)
+                        const hasInternetConfigError = row.showInternetConfigError && !updatedRowIdsSet.has(row.id)
                         const showError = hasFeasibilityError || hasInternetConfigError
                         const errorMessage = hasFeasibilityError
                           ? (row.errorSummary || 'Error summary in a sentence.')
@@ -594,7 +649,9 @@ function SummaryTabContent({ locations = [], onTotalsChange, onEditRow, showFeas
                             className="w-full px-3 py-1.5 text-left text-xs text-gray-700 hover:bg-grey-bg"
                             onClick={() => {
                               setOpenMenuRowId(null)
-                              onEditRow?.(row)
+                              const idsToPass = new Set(selectedIds)
+                              if (row?.id) idsToPass.add(row.id)
+                              onEditRow?.(row, idsToPass)
                             }}
                           >
                             Edit
