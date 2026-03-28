@@ -2,7 +2,7 @@
  * Configure Technical Attributes form - sections:
  * Account & Order Details, Internet, Primary Link, Connectivity IP Block, Connectivity LAN IP, Connectivity WAN IP
  */
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 
 const SELECT_OPTION = 'Select an Option'
 
@@ -57,6 +57,585 @@ const OPTIONS = {
   customerPortType: [SELECT_OPTION, 'Copper', 'Fiber', 'SFP'],
   routingProtocol: [SELECT_OPTION, 'BGP', 'Static', 'OSPF', 'ISIS'],
   routingType: ['Static', 'Private BGP', 'Static with Public BGP', 'Public BGP', 'Static with Private BGP', 'None'],
+}
+
+const CONFIDENCE_LEVEL_PROFILES = {
+  'All Confidence Levels': {
+    code: 'ALL',
+    dates: {
+      'Customer Needed By Date': '2026-04-20',
+      'Likely Date of Site Readiness': '2026-04-28',
+    },
+    selects: {
+      'Reason for Zero Value Order': 'N/A',
+      'Interface': 'Gigabit',
+      'Site Readiness Status': 'Ready',
+      'Routing Type': 'Static',
+      'Handover Type': 'Non NNI',
+      'RTBH': 'No',
+      'SNMP version': 'v3',
+      'DDoS Type': 'No',
+      'Customer Port Type': 'Fiber',
+      'Default Originate': 'No',
+      'BGP Session Per Link': '1',
+      'Send Community eBGP': 'No',
+      'BGP Log': 'No',
+      'BFD': 'No',
+      'Fast Detect': 'No',
+      'Multiplier': '3',
+      'Minimum Interval': '200',
+    },
+    texts: {
+      'Disconnection SR Number': 'SR-ALL-1024',
+      'Disconnection LSI Number': 'LSI-ALL-44551',
+      'Customer PM First Name': 'Asha',
+      'Customer PM Last Name': 'Nair',
+      'Customer PM Phone': '9876543210',
+      'Customer PM Email': 'asha.nair@hdfcbank.com',
+      'BGP Prefix Limit': '1000',
+      Username: 'snmp_all_user',
+      Groupname: 'netops',
+      'Privacy / Encryption Type': 'AES-256',
+      'Privacy / Encryption Password': 'Enc@12345',
+      'Access POP NW Loc Code': 'DEL-POP-01',
+      'BTS Address': 'Connaught Place, New Delhi',
+      'BTS NW Loc Code': 'DEL-BTS-01',
+      CVLAN: '120',
+      'Customer NW Loc Code': 'HDFC-DEL-01',
+      'ISP MPLS POP NW Loc Code': 'MPLS-DEL-01',
+      LNSPopCode: 'LNS-DEL-01',
+      'Network Element': 'NE-DEL-EDGE-01',
+      'RSU NW Loc Code': 'RSU-DEL-01',
+    },
+  },
+  'Below 30%': {
+    code: 'L30',
+    dates: {
+      'Customer Needed By Date': '2026-06-18',
+      'Likely Date of Site Readiness': '2026-07-05',
+    },
+    selects: {
+      'Reason for Zero Value Order': 'Credit',
+      'Interface': 'SFP',
+      'Site Readiness Status': 'Not Started',
+      'Routing Type': 'Private BGP',
+      'Handover Type': 'NNI',
+      'Peering Type': 'Physical',
+      'BGP Input Type': 'Manual',
+      'Remove Private AS': 'Yes',
+      'AS Override': 'No',
+      'BGP Dampening': 'Yes',
+      'BGP Timers': 'Custom',
+      'bgp-Replace AS': 'Yes',
+      'Default Originate': 'Yes',
+      'BGP Session Per Link': '2',
+      'Send Community eBGP': 'Yes',
+      'BGP Log': 'Yes',
+      'RTBH': 'Yes',
+      BFD: 'Yes',
+      'DDoS Type': 'Yes',
+      'Customer Port Type': 'Copper',
+      'SNMP version': 'v2',
+      'Fast Detect': 'Yes',
+      Multiplier: '5',
+      'Minimum Interval': '500',
+    },
+    texts: {
+      'Disconnection SR Number': 'SR-L30-2198',
+      'Disconnection LSI Number': 'LSI-L30-78120',
+      'Customer PM First Name': 'Ravi',
+      'Customer PM Last Name': 'Kumar',
+      'Customer PM Phone': '9890011223',
+      'Customer PM Email': 'ravi.kumar@hdfcbank.com',
+      'Customer AS Number': '64521',
+      'As Set': 'AS-HDFC-L30',
+      'BGP Password': 'bgpL30#2026',
+      'eBGP Multihop': '8',
+      Keepalive: '90',
+      Holdtime: '180',
+      SOO: '65000:130',
+      'Airtel Loopback IP': '10.30.1.1',
+      'Customer Loopback IP': '10.30.1.2',
+      'Customer LAN IP': '172.30.10.1',
+      Username: 'snmp_low_user',
+      Groupname: 'support-low',
+      'Privacy / Encryption Type': 'AES-128',
+      'Privacy / Encryption Password': 'LowEnc@2026',
+      'Access POP NW Loc Code': 'DEL-POP-03',
+      'BTS Address': 'Karol Bagh, New Delhi',
+      'BTS NW Loc Code': 'DEL-BTS-03',
+      CVLAN: '210',
+      'Customer NW Loc Code': 'HDFC-DEL-L30',
+      'ISP MPLS POP NW Loc Code': 'MPLS-DEL-03',
+      LNSPopCode: 'LNS-DEL-03',
+      'Network Element': 'NE-DEL-EDGE-03',
+      'RSU NW Loc Code': 'RSU-DEL-03',
+    },
+  },
+  '30-50%': {
+    code: 'M50',
+    dates: {
+      'Customer Needed By Date': '2026-05-25',
+      'Likely Date of Site Readiness': '2026-06-08',
+    },
+    selects: {
+      'Reason for Zero Value Order': 'Waiver',
+      Interface: 'Gigabit',
+      'Site Readiness Status': 'Pending',
+      'Routing Type': 'Static with Public BGP',
+      'Handover Type': 'Non NNI',
+      'Peering Type': 'Loopback',
+      'BGP Input Type': 'Manual',
+      'Remove Private AS': 'No',
+      'AS Override': 'Yes',
+      'BGP Dampening': 'No',
+      'BGP Timers': 'Custom',
+      'bgp-Replace AS': 'No',
+      'Default Originate': 'No',
+      'BGP Session Per Link': '1',
+      'Send Community eBGP': 'No',
+      'BGP Log': 'Yes',
+      RTBH: 'No',
+      BFD: 'Yes',
+      'DDoS Type': 'No',
+      'Customer Port Type': 'Fiber',
+      'SNMP version': 'v3',
+      'Fast Detect': 'Yes',
+      Multiplier: '3',
+      'Minimum Interval': '200',
+    },
+    texts: {
+      'Disconnection SR Number': 'SR-M50-3301',
+      'Disconnection LSI Number': 'LSI-M50-90112',
+      'Customer PM First Name': 'Neha',
+      'Customer PM Last Name': 'Sharma',
+      'Customer PM Phone': '9891198822',
+      'Customer PM Email': 'neha.sharma@hdfcbank.com',
+      'Customer AS Number': '64531',
+      'As Set': 'AS-HDFC-M50',
+      'BGP Password': 'bgpM50#2026',
+      'eBGP Multihop': '6',
+      Keepalive: '60',
+      Holdtime: '120',
+      SOO: '65000:150',
+      'Airtel Loopback IP': '10.50.1.1',
+      'Customer Loopback IP': '10.50.1.2',
+      'Customer LAN IP': '172.50.10.1',
+      Username: 'snmp_m50_user',
+      Groupname: 'support-mid',
+      'Privacy / Encryption Type': 'AES-256',
+      'Privacy / Encryption Password': 'MidEnc@2026',
+      'Access POP NW Loc Code': 'DEL-POP-05',
+      'BTS Address': 'Dwarka Sector 12, Delhi',
+      'BTS NW Loc Code': 'DEL-BTS-05',
+      CVLAN: '250',
+      'Customer NW Loc Code': 'HDFC-DEL-M50',
+      'ISP MPLS POP NW Loc Code': 'MPLS-DEL-05',
+      LNSPopCode: 'LNS-DEL-05',
+      'Network Element': 'NE-DEL-EDGE-05',
+      'RSU NW Loc Code': 'RSU-DEL-05',
+    },
+  },
+  '50-70%': {
+    code: 'M70',
+    dates: {
+      'Customer Needed By Date': '2026-05-10',
+      'Likely Date of Site Readiness': '2026-05-28',
+    },
+    selects: {
+      'Reason for Zero Value Order': 'N/A',
+      Interface: '10G',
+      'Site Readiness Status': 'Pending',
+      'Routing Type': 'Public BGP',
+      'Handover Type': 'Non NNI',
+      'Peering Type': 'Loopback',
+      'BGP Input Type': 'Auto',
+      'Remove Private AS': 'No',
+      'AS Override': 'Yes',
+      'BGP Dampening': 'No',
+      'BGP Timers': 'Default',
+      'bgp-Replace AS': 'No',
+      'Default Originate': 'No',
+      'BGP Session Per Link': '1',
+      'Send Community eBGP': 'Yes',
+      'BGP Log': 'No',
+      RTBH: 'No',
+      BFD: 'Yes',
+      'DDoS Type': 'No',
+      'Customer Port Type': 'Fiber',
+      'SNMP version': 'v3',
+      'Fast Detect': 'No',
+      Multiplier: '2',
+      'Minimum Interval': '100',
+    },
+    texts: {
+      'Disconnection SR Number': 'SR-M70-4822',
+      'Disconnection LSI Number': 'LSI-M70-11132',
+      'Customer PM First Name': 'Ankit',
+      'Customer PM Last Name': 'Verma',
+      'Customer PM Phone': '9810023456',
+      'Customer PM Email': 'ankit.verma@hdfcbank.com',
+      'Customer AS Number': '64541',
+      'As Set': 'AS-HDFC-M70',
+      'BGP Password': 'bgpM70#2026',
+      'eBGP Multihop': '5',
+      Keepalive: '45',
+      Holdtime: '90',
+      SOO: '65000:170',
+      'Airtel Loopback IP': '10.70.1.1',
+      'Customer Loopback IP': '10.70.1.2',
+      'Customer LAN IP': '172.70.10.1',
+      Username: 'snmp_m70_user',
+      Groupname: 'support-high',
+      'Privacy / Encryption Type': 'AES-256',
+      'Privacy / Encryption Password': 'HighEnc@2026',
+      'Access POP NW Loc Code': 'DEL-POP-07',
+      'BTS Address': 'Noida Sector 62',
+      'BTS NW Loc Code': 'NCR-BTS-07',
+      CVLAN: '310',
+      'Customer NW Loc Code': 'HDFC-NCR-M70',
+      'ISP MPLS POP NW Loc Code': 'MPLS-NCR-07',
+      LNSPopCode: 'LNS-NCR-07',
+      'Network Element': 'NE-NCR-EDGE-07',
+      'RSU NW Loc Code': 'RSU-NCR-07',
+    },
+  },
+  '70-85%': {
+    code: 'H85',
+    dates: {
+      'Customer Needed By Date': '2026-04-30',
+      'Likely Date of Site Readiness': '2026-05-15',
+    },
+    selects: {
+      'Reason for Zero Value Order': 'N/A',
+      Interface: '10G',
+      'Site Readiness Status': 'Ready',
+      'Routing Type': 'Static with Private BGP',
+      'Handover Type': 'Non NNI',
+      RTBH: 'No',
+      'SNMP version': 'v3',
+      'DDoS Type': 'No',
+      'Customer Port Type': 'Fiber',
+      'Default Originate': 'No',
+      'BGP Session Per Link': '1',
+      'Send Community eBGP': 'No',
+      'BGP Log': 'No',
+      BFD: 'No',
+      'Fast Detect': 'No',
+      Multiplier: '2',
+      'Minimum Interval': '100',
+    },
+    texts: {
+      'Disconnection SR Number': 'SR-H85-5501',
+      'Disconnection LSI Number': 'LSI-H85-22210',
+      'Customer PM First Name': 'Meera',
+      'Customer PM Last Name': 'Kapoor',
+      'Customer PM Phone': '9820012345',
+      'Customer PM Email': 'meera.kapoor@hdfcbank.com',
+      'BGP Prefix Limit': '1200',
+      Username: 'snmp_h85_user',
+      Groupname: 'noc-high',
+      'Privacy / Encryption Type': 'AES-256',
+      'Privacy / Encryption Password': 'ReadyEnc@2026',
+      'Access POP NW Loc Code': 'DEL-POP-09',
+      'BTS Address': 'Gurugram Cyber City',
+      'BTS NW Loc Code': 'NCR-BTS-09',
+      CVLAN: '330',
+      'Customer NW Loc Code': 'HDFC-NCR-H85',
+      'ISP MPLS POP NW Loc Code': 'MPLS-NCR-09',
+      LNSPopCode: 'LNS-NCR-09',
+      'Network Element': 'NE-NCR-EDGE-09',
+      'RSU NW Loc Code': 'RSU-NCR-09',
+    },
+  },
+  'Above 85%': {
+    code: 'TOP',
+    dates: {
+      'Customer Needed By Date': '2026-04-25',
+      'Likely Date of Site Readiness': '2026-05-05',
+    },
+    selects: {
+      'Reason for Zero Value Order': 'N/A',
+      Interface: '10G',
+      'Site Readiness Status': 'Ready',
+      'Routing Type': 'Static',
+      'Handover Type': 'Non NNI',
+      RTBH: 'No',
+      'SNMP version': 'v3',
+      'DDoS Type': 'No',
+      'Customer Port Type': 'Fiber',
+      'Default Originate': 'No',
+      'BGP Session Per Link': '1',
+      'Send Community eBGP': 'No',
+      'BGP Log': 'No',
+      BFD: 'No',
+      'Fast Detect': 'No',
+      Multiplier: '1',
+      'Minimum Interval': '100',
+    },
+    texts: {
+      'Disconnection SR Number': 'SR-TOP-7001',
+      'Disconnection LSI Number': 'LSI-TOP-30010',
+      'Customer PM First Name': 'Priya',
+      'Customer PM Last Name': 'Iyer',
+      'Customer PM Phone': '9811112233',
+      'Customer PM Email': 'priya.iyer@hdfcbank.com',
+      'BGP Prefix Limit': '1500',
+      Username: 'snmp_top_user',
+      Groupname: 'noc-premium',
+      'Privacy / Encryption Type': 'AES-256',
+      'Privacy / Encryption Password': 'TopEnc@2026',
+      'Access POP NW Loc Code': 'DEL-POP-11',
+      'BTS Address': 'Aerocity, New Delhi',
+      'BTS NW Loc Code': 'DEL-BTS-11',
+      CVLAN: '350',
+      'Customer NW Loc Code': 'HDFC-DEL-TOP',
+      'ISP MPLS POP NW Loc Code': 'MPLS-DEL-11',
+      LNSPopCode: 'LNS-DEL-11',
+      'Network Element': 'NE-DEL-EDGE-11',
+      'RSU NW Loc Code': 'RSU-DEL-11',
+    },
+  },
+}
+
+const ROUTING_TYPE_DEPENDENT_VALUES = {
+  Static: {
+    selects: {
+      'Customer Link Type': 'Customer Link',
+      RTBH: 'No',
+      'SNMP version': 'v3',
+      'DDoS Type': 'No',
+      'Customer Port Type': 'Fiber',
+    },
+    texts: {
+      'BGP Prefix Limit': '1000',
+      Username: 'snmp_static_user',
+      Groupname: 'static-ops',
+      'Privacy / Encryption Type': 'AES-256',
+      'Privacy / Encryption Password': 'Static@2026',
+      'Access POP NW Loc Code': 'DEL-POP-ST01',
+      'BTS Address': 'Connaught Place, New Delhi',
+      'BTS NW Loc Code': 'DEL-BTS-ST01',
+      CVLAN: '120',
+      'Customer NW Loc Code': 'HDFC-DEL-ST01',
+      'ISP MPLS POP NW Loc Code': 'MPLS-DEL-ST01',
+      LNSPopCode: 'LNS-DEL-ST01',
+      'Network Element': 'NE-DEL-ST01',
+      'RSU NW Loc Code': 'RSU-DEL-ST01',
+    },
+    dates: {
+      'Likely Date of Site Readiness': '2026-05-15',
+    },
+  },
+  'Private BGP': {
+    selects: {
+      'Remove Private AS': 'Yes',
+      'Peering Type': 'Physical',
+      'BGP Input Type': 'Manual',
+      'Routing Table': 'Custom',
+      'AS Override': 'No',
+      'BGP Dampening': 'Yes',
+      'BGP Timers': 'Custom',
+      'bgp-Replace AS': 'Yes',
+      'Customer Link Type': 'Customer Link',
+      'Default Originate': 'Yes',
+      'BGP Session Per Link': '2',
+      'Send Community eBGP': 'Yes',
+      'BGP Log': 'Yes',
+      RTBH: 'Yes',
+      BFD: 'Yes',
+      'Fast Detect': 'Yes',
+      Multiplier: '5',
+      'Minimum Interval': '500',
+      'SNMP version': 'v2',
+      'DDoS Type': 'Yes',
+      'Customer Port Type': 'Copper',
+    },
+    texts: {
+      'Customer AS Number': '64521',
+      'As Set': 'AS-HDFC-PRIV',
+      'BGP Password': 'privBGP@2026',
+      'eBGP Multihop': '8',
+      Keepalive: '90',
+      Holdtime: '180',
+      SOO: '65000:121',
+      'Airtel Loopback IP': '10.21.1.1',
+      'Customer Loopback IP': '10.21.1.2',
+      'Customer LAN IP': '172.21.10.1',
+      Username: 'snmp_priv_user',
+      Groupname: 'bgp-private',
+      'Privacy / Encryption Type': 'AES-128',
+      'Privacy / Encryption Password': 'PrivEnc@2026',
+      'Access POP NW Loc Code': 'DEL-POP-PB01',
+      'BTS Address': 'Noida Sector 62',
+      'BTS NW Loc Code': 'NCR-BTS-PB01',
+      CVLAN: '221',
+      'Customer NW Loc Code': 'HDFC-NCR-PB01',
+      'ISP MPLS POP NW Loc Code': 'MPLS-NCR-PB01',
+      LNSPopCode: 'LNS-NCR-PB01',
+      'Network Element': 'NE-NCR-PB01',
+      'RSU NW Loc Code': 'RSU-NCR-PB01',
+    },
+    dates: {
+      'Likely Date of Site Readiness': '2026-06-10',
+    },
+  },
+  'Static with Public BGP': {
+    selects: {
+      'Remove Private AS': 'No',
+      'Peering Type': 'Loopback',
+      'BGP Input Type': 'Manual',
+      'Routing Table': 'Default BGP',
+      'AS Override': 'Yes',
+      'BGP Dampening': 'No',
+      'BGP Timers': 'Custom',
+      'bgp-Replace AS': 'No',
+      'Customer Link Type': 'Customer Link',
+      'Default Originate': 'No',
+      'BGP Session Per Link': '1',
+      'Send Community eBGP': 'No',
+      'BGP Log': 'Yes',
+      RTBH: 'No',
+      BFD: 'Yes',
+      'Fast Detect': 'Yes',
+      Multiplier: '3',
+      'Minimum Interval': '200',
+      'SNMP version': 'v3',
+      'DDoS Type': 'No',
+      'Customer Port Type': 'Fiber',
+    },
+    texts: {
+      'Customer AS Number': '64531',
+      'As Set': 'AS-HDFC-SPB',
+      'BGP Password': 'stPubBGP@2026',
+      'eBGP Multihop': '6',
+      Keepalive: '60',
+      Holdtime: '120',
+      SOO: '65000:152',
+      'Airtel Loopback IP': '10.31.1.1',
+      'Customer Loopback IP': '10.31.1.2',
+      'Customer LAN IP': '172.31.10.1',
+      Username: 'snmp_spb_user',
+      Groupname: 'bgp-hybrid',
+      'Privacy / Encryption Type': 'AES-256',
+      'Privacy / Encryption Password': 'SpbEnc@2026',
+    },
+    dates: {
+      'Likely Date of Site Readiness': '2026-05-28',
+    },
+  },
+  'Public BGP': {
+    selects: {
+      'Remove Private AS': 'No',
+      'Peering Type': 'Loopback',
+      'BGP Input Type': 'Auto',
+      'Routing Table': 'Default BGP',
+      'AS Override': 'Yes',
+      'BGP Dampening': 'No',
+      'BGP Timers': 'Default',
+      'bgp-Replace AS': 'No',
+      'Customer Link Type': 'Customer Link',
+      'Default Originate': 'No',
+      'BGP Session Per Link': '1',
+      'Send Community eBGP': 'Yes',
+      'BGP Log': 'No',
+      RTBH: 'No',
+      BFD: 'Yes',
+      'Fast Detect': 'No',
+      Multiplier: '2',
+      'Minimum Interval': '100',
+      'SNMP version': 'v3',
+      'DDoS Type': 'No',
+      'Customer Port Type': 'Fiber',
+    },
+    texts: {
+      'Customer AS Number': '64541',
+      'As Set': 'AS-HDFC-PUB',
+      'BGP Password': 'pubBGP@2026',
+      'eBGP Multihop': '5',
+      Keepalive: '45',
+      Holdtime: '90',
+      SOO: '65000:172',
+      'Airtel Loopback IP': '10.41.1.1',
+      'Customer Loopback IP': '10.41.1.2',
+      'Customer LAN IP': '172.41.10.1',
+      Username: 'snmp_pub_user',
+      Groupname: 'bgp-public',
+      'Privacy / Encryption Type': 'AES-256',
+      'Privacy / Encryption Password': 'PubEnc@2026',
+    },
+    dates: {
+      'Likely Date of Site Readiness': '2026-05-22',
+    },
+  },
+  'Static with Private BGP': {
+    selects: {
+      'Remove Private AS': 'Yes',
+      'Peering Type': 'Physical',
+      'BGP Input Type': 'Manual',
+      'Routing Table': 'Custom',
+      'AS Override': 'No',
+      'BGP Dampening': 'Yes',
+      'BGP Timers': 'Custom',
+      'bgp-Replace AS': 'Yes',
+      'Customer Link Type': 'Customer Link',
+      'Default Originate': 'Yes',
+      'BGP Session Per Link': '2',
+      'Send Community eBGP': 'Yes',
+      'BGP Log': 'Yes',
+      RTBH: 'Yes',
+      BFD: 'Yes',
+      'Fast Detect': 'Yes',
+      Multiplier: '5',
+      'Minimum Interval': '500',
+      'SNMP version': 'v2',
+      'DDoS Type': 'Yes',
+      'Customer Port Type': 'Copper',
+    },
+    texts: {
+      'Customer AS Number': '64551',
+      'As Set': 'AS-HDFC-SPRIV',
+      'BGP Password': 'stPrivBGP@2026',
+      'eBGP Multihop': '8',
+      Keepalive: '90',
+      Holdtime: '180',
+      SOO: '65000:182',
+      'Airtel Loopback IP': '10.51.1.1',
+      'Customer Loopback IP': '10.51.1.2',
+      'Customer LAN IP': '172.51.10.1',
+      Username: 'snmp_spriv_user',
+      Groupname: 'bgp-static-private',
+      'Privacy / Encryption Type': 'AES-128',
+      'Privacy / Encryption Password': 'SPrivEnc@2026',
+    },
+    dates: {
+      'Likely Date of Site Readiness': '2026-06-15',
+    },
+  },
+}
+
+function normalizeFieldLabel(raw) {
+  return String(raw || '').replace(/\*/g, '').replace(/\s+/g, ' ').trim()
+}
+
+function findFormFieldLabel(field, formEl) {
+  let current = field.parentElement
+  while (current && current !== formEl) {
+    const scopedLabel = current.querySelector(':scope > label')
+    if (scopedLabel) return normalizeFieldLabel(scopedLabel.textContent)
+    current = current.parentElement
+  }
+  return ''
+}
+
+function getFallbackValue(label, profileCode, index) {
+  if (!label) return ''
+  if (label.toLowerCase().includes('email')) return `ops.${profileCode.toLowerCase()}${index}@hdfcbank.com`
+  if (label.toLowerCase().includes('phone') || label.toLowerCase().includes('contact')) return `98${String(10000000 + index).slice(-8)}`
+  if (label.toLowerCase().includes('password')) return `Pass@${profileCode}${index}`
+  if (label.toLowerCase().includes('ip')) return `10.${index % 200}.${(index * 3) % 200}.1`
+  if (label.toLowerCase().includes('number') || label.toLowerCase().includes('code')) return `${profileCode}-${String(index).padStart(4, '0')}`
+  return `${label} ${profileCode} ${index}`
 }
 
 function FormField({ label, required, error, children, showOldValues, oldValue }) {
@@ -118,16 +697,115 @@ function FieldDate({ defaultValue = '', disabled }) {
   )
 }
 
-export default function ConfigureTechnicalAttributesContent({ onDirtyChange, compareWithAsset, technicalAttributesOverrides }) {
+export default function ConfigureTechnicalAttributesContent({ onDirtyChange, compareWithAsset, technicalAttributesOverrides, confidenceLevel = 'Below 30%' }) {
+  const formRef = useRef(null)
   const [routingType, setRoutingType] = useState(technicalAttributesOverrides?.routingType ?? '')
+  const [activeConfidenceLevel, setActiveConfidenceLevel] = useState(confidenceLevel)
   useEffect(() => {
     if (technicalAttributesOverrides?.routingType) setRoutingType(technicalAttributesOverrides.routingType)
   }, [technicalAttributesOverrides])
+  useEffect(() => {
+    setActiveConfidenceLevel(confidenceLevel)
+  }, [confidenceLevel])
+  useEffect(() => {
+    const profile = CONFIDENCE_LEVEL_PROFILES[activeConfidenceLevel] || CONFIDENCE_LEVEL_PROFILES['All Confidence Levels']
+    const routingByConfidence = profile?.selects?.['Routing Type'] || 'Static'
+    if (!technicalAttributesOverrides?.routingType) {
+      setRoutingType(routingByConfidence)
+    }
+  }, [activeConfidenceLevel, technicalAttributesOverrides])
+
+  useEffect(() => {
+    const formEl = formRef.current
+    if (!formEl) return
+
+    const profile = CONFIDENCE_LEVEL_PROFILES[activeConfidenceLevel] || CONFIDENCE_LEVEL_PROFILES['All Confidence Levels']
+    const desiredRoutingType = profile?.selects?.['Routing Type']
+    if (!technicalAttributesOverrides?.routingType && desiredRoutingType) {
+      setRoutingType(desiredRoutingType)
+    }
+
+    const timer = setTimeout(() => {
+      let fallbackIndex = 1
+      formEl.querySelectorAll('input, select, textarea').forEach((field) => {
+        if (field.disabled) return
+        const parentSection = field.closest('section')
+        const sectionTitle = normalizeFieldLabel(parentSection?.querySelector('h3')?.textContent || '')
+        if (sectionTitle === 'Account & Order Details') return
+        const label = findFormFieldLabel(field, formEl)
+        if (!label) return
+
+        if (field.tagName === 'SELECT') {
+          const desired = profile?.selects?.[label]
+          if (desired && Array.from(field.options).some((opt) => opt.value === desired)) {
+            field.value = desired
+          } else if (field.value === '') {
+            const firstSelectable = Array.from(field.options).find((opt) => opt.value !== '')
+            if (firstSelectable) field.value = firstSelectable.value
+          }
+          return
+        }
+
+        if (field.type === 'date') {
+          const desired = profile?.dates?.[label] || profile?.dates?.['Customer Needed By Date']
+          if (desired) field.value = desired
+          return
+        }
+
+        if (field.type === 'text') {
+          const desired = profile?.texts?.[label]
+          field.value = desired || getFallbackValue(label, profile?.code || 'ALL', fallbackIndex)
+          fallbackIndex += 1
+        }
+      })
+    }, 0)
+
+    return () => clearTimeout(timer)
+  }, [activeConfidenceLevel])
+
+  useEffect(() => {
+    const formEl = formRef.current
+    if (!formEl) return
+    const routingProfile = ROUTING_TYPE_DEPENDENT_VALUES[routingType]
+    if (!routingProfile) return
+
+    const timer = setTimeout(() => {
+      formEl.querySelectorAll('input, select, textarea').forEach((field) => {
+        if (field.disabled) return
+        const parentSection = field.closest('section')
+        const sectionTitle = normalizeFieldLabel(parentSection?.querySelector('h3')?.textContent || '')
+        if (sectionTitle === 'Account & Order Details') return
+        const label = findFormFieldLabel(field, formEl)
+        if (!label) return
+
+        if (field.tagName === 'SELECT') {
+          const desired = routingProfile.selects?.[label]
+          if (desired && Array.from(field.options).some((opt) => opt.value === desired)) {
+            field.value = desired
+          }
+          return
+        }
+
+        if (field.type === 'date') {
+          const desired = routingProfile.dates?.[label]
+          if (desired) field.value = desired
+          return
+        }
+
+        if (field.type === 'text') {
+          const desired = routingProfile.texts?.[label]
+          if (desired) field.value = desired
+        }
+      })
+    }, 0)
+
+    return () => clearTimeout(timer)
+  }, [routingType])
   const gridClass = 'grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-x-4 gap-y-3 text-xs'
   const isStaticRouting = routingType === 'Static'
 
   return (
-    <form onChange={() => onDirtyChange?.(true)} onInput={() => onDirtyChange?.(true)} className="space-y-8">
+    <form ref={formRef} onChange={() => onDirtyChange?.(true)} onInput={() => onDirtyChange?.(true)} className="space-y-8">
       {/* 1. Account & Order Details */}
       <section>
         <h3 className="text-sm font-semibold text-gray-900 mb-4">Account & Order Details</h3>

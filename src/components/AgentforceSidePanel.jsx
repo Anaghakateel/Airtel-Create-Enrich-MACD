@@ -675,11 +675,11 @@ function AgentforceSidePanel({
       } else if (isPOIntent(text)) {
         setMessages([...prependIntro, userMsg, { id: `agent-${Date.now()}`, role: 'agent', text: PO_AGENT_RESPONSE, isPOUploadQuestion: true }])
       } else {
-        setMessages([
+      setMessages([
           ...prependIntro,
           userMsg,
           { id: `agent-${Date.now()}`, role: 'agent', text: 'I can help with creating quote proposals, matching products, or updating/changing quote values. Try asking something like: "I want to create a quote proposal", "Match all products", or "Update the attributes for SD WAN from managed to co-owned".' },
-        ])
+      ])
       }
       return
     }
@@ -857,15 +857,15 @@ function AgentforceSidePanel({
       ...prev,
       { id: `user-upload-${Date.now()}`, role: 'user', text: `Uploading document (${fileName})` },
       { id: analyzingId, role: 'agent', isUpgradeAttributesAnalyzing: true, upgradeAttributesStageIndex: 0 },
-    ])
-    let step = 0
+      ])
+      let step = 0
     upgradeAttributesAnalyzingIntervalRef.current = setInterval(() => {
-      step += 1
+        step += 1
       if (step >= 4) {
         if (upgradeAttributesAnalyzingIntervalRef.current) clearInterval(upgradeAttributesAnalyzingIntervalRef.current)
         upgradeAttributesAnalyzingIntervalRef.current = null
-        setMessages((prev) =>
-          prev.map((m) =>
+          setMessages((prev) =>
+            prev.map((m) =>
             m.id === analyzingId ? { ...m, id: m.id, role: 'agent', text: UPGRADE_ATTRIBUTES_RESPONSE_PREFIX, showUpgradeQuoteLink: true, isUpgradeAttributesAnalyzing: false } : m
           )
         )
@@ -874,7 +874,7 @@ function AgentforceSidePanel({
       }
       setMessages((prev) => prev.map((m) => (m.id === analyzingId ? { ...m, upgradeAttributesStageIndex: step } : m)))
       scrollToBottom()
-    }, 1500)
+      }, 1500)
   }
 
   const handlePOUploadSubmit = () => {
@@ -908,21 +908,21 @@ function AgentforceSidePanel({
     setUploadFormFile(null)
     if (uploadFormFileInputRef.current) uploadFormFileInputRef.current.value = ''
     const analyzingId = `quote-proposal-analyzing-${Date.now()}`
-    setMessages((prev) => [
-      ...prev,
+      setMessages((prev) => [
+        ...prev,
       { id: `user-upload-${Date.now()}`, role: 'user', text: `Updated the document (${fileName})` },
       { id: analyzingId, role: 'agent', isAnalyzing: true, analyzingStageIndex: 0 },
-    ])
+      ])
     console.log('[Agentforce Upload] Quote Proposal – setMessages called (analyzing started), analyzingId:', analyzingId)
-    let step = 0
+      let step = 0
     quoteProposalAnalyzingIntervalRef.current = setInterval(() => {
-      step += 1
+        step += 1
       console.log('[Agentforce Upload] Quote Proposal – analysis step:', step)
       if (step >= 4) {
         if (quoteProposalAnalyzingIntervalRef.current) clearInterval(quoteProposalAnalyzingIntervalRef.current)
         quoteProposalAnalyzingIntervalRef.current = null
-        setMessages((prev) =>
-          prev.map((m) =>
+          setMessages((prev) =>
+            prev.map((m) =>
             m.id === analyzingId ? { id: m.id, role: 'agent', text: QUOTE_PROPOSAL_PROCESSING_TEXT, showQuoteProposalStatusLink: true } : m
           )
         )
@@ -1150,50 +1150,50 @@ function AgentforceSidePanel({
   if (!open) return null
 
   return (
-    <aside
+      <aside
       className="fixed top-[7rem] right-0 bottom-0 bg-white border-l border-gray-200 shadow-xl z-[60] flex flex-col min-h-0 overflow-hidden"
-      style={{ width: panelWidth, maxWidth: '90vw' }}
-      aria-label="Agentforce panel"
-    >
-      <div
-        role="button"
-        tabIndex={isPinned ? -1 : 0}
-        onMouseDown={handleResizeMouseDown}
-        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') e.preventDefault() }}
-        className={`absolute left-0 top-1/2 -translate-y-1/2 py-3 px-1 flex items-center justify-center focus:outline-none focus:ring-0 z-[60] ${isPinned ? 'cursor-default opacity-60' : 'cursor-col-resize'}`}
-        aria-label={isPinned ? 'Panel width locked' : 'Resize panel'}
+        style={{ width: panelWidth, maxWidth: '90vw' }}
+        aria-label="Agentforce panel"
       >
-        <svg className="w-4 h-4 text-blue-600" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-          <path d="M6 12L18 4v16L6 12z" />
-        </svg>
-      </div>
-      <div className="flex items-center justify-between px-4 py-3 bg-white border-b border-gray-200 shrink-0">
-        <div className="flex items-center gap-2">
+        <div
+          role="button"
+          tabIndex={isPinned ? -1 : 0}
+          onMouseDown={handleResizeMouseDown}
+          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') e.preventDefault() }}
+          className={`absolute left-0 top-1/2 -translate-y-1/2 py-3 px-1 flex items-center justify-center focus:outline-none focus:ring-0 z-[60] ${isPinned ? 'cursor-default opacity-60' : 'cursor-col-resize'}`}
+          aria-label={isPinned ? 'Panel width locked' : 'Resize panel'}
+        >
+          <svg className="w-4 h-4 text-blue-600" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M6 12L18 4v16L6 12z" />
+          </svg>
+        </div>
+        <div className="flex items-center justify-between px-4 py-3 bg-white border-b border-gray-200 shrink-0">
+          <div className="flex items-center gap-2">
           <span className={`text-base font-bold ${showSalesAssistantStyle ? 'text-airtel-red' : 'text-[#032d60]'}`}>
             {showSalesAssistantStyle ? 'Sales Assistant' : 'Agentforce'}
           </span>
           <button type="button" className="w-6 h-6 rounded-full bg-blue-600 flex items-center justify-center text-white hover:bg-blue-700 focus:outline-none shrink-0" aria-label="Information">
-            <span className="text-xs font-bold">i</span>
-          </button>
-        </div>
-        <div className="flex items-center gap-3">
+              <span className="text-xs font-bold">i</span>
+            </button>
+          </div>
+          <div className="flex items-center gap-3">
           <button type="button" onClick={() => setHasNotification(false)} className="relative p-1.5 rounded-full text-[#032d60] hover:bg-grey-bg focus:outline-none" aria-label="Chat history">
-            <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-              <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H5.17L4 17.17V4h16v12z" />
+              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H5.17L4 17.17V4h16v12z" />
               <circle cx="7.5" cy="10" r="1" /><circle cx="12" cy="10" r="1" /><circle cx="16.5" cy="10" r="1" />
-            </svg>
+              </svg>
             {hasNotification && <span className="absolute top-1 right-1 w-2.5 h-2.5 rounded-full bg-red-500 ring-2 ring-white" aria-hidden="true" />}
-          </button>
+            </button>
           <button type="button" onClick={() => setIsPinned((p) => !p)} className={`p-1.5 rounded-full focus:outline-none ${isPinned ? 'bg-blue-100 text-blue-600' : 'text-[#032d60] hover:bg-grey-bg'}`} aria-label={isPinned ? 'Unpin panel width' : 'Pin panel width'}>
             <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M16 12V4h1V2H7v2h1v8l-2 2v2h5.2v6h1.6v-6H18v-2l-2-2z" /></svg>
-          </button>
+            </button>
           <button type="button" onClick={onClose} className="p-1.5 rounded-full text-[#032d60] hover:bg-grey-bg focus:outline-none" aria-label="Close panel">
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-          </button>
+            </button>
+          </div>
         </div>
-      </div>
 
-      {!effectiveIsConversationView ? (
+        {!effectiveIsConversationView ? (
         <div className="flex-1 min-h-0 overflow-y-scroll pt-8 px-4 pb-4 flex flex-col items-center bg-white">
           <img src={agentforceIllustration} alt="" className="w-40 h-40 rounded-full object-cover object-center shrink-0" />
           <h2 className="text-lg font-bold text-[#032d60] mt-4">Let&apos;s chat!</h2>
@@ -1205,9 +1205,9 @@ function AgentforceSidePanel({
           )}
           <button type="button" onClick={startConversation} className="mt-6 px-6 py-3 rounded-full bg-airtel-red text-white text-sm font-medium hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-airtel-red/30">
             Get Started
-          </button>
-        </div>
-      ) : (
+              </button>
+          </div>
+        ) : (
         <div
           ref={conversationScrollRef}
           role="region"
@@ -1235,13 +1235,13 @@ function AgentforceSidePanel({
               const upgradeAttributesAlreadySubmitted = msg.uploadFormType === 'upgradeAttributes' && laterMessages.some((m) => m.showUpgradeQuoteLink)
               const hideUploadFormBecauseSubmitted = msg.showUploadForm && (quoteProposalAlreadySubmitted || upgradeAttributesAlreadySubmitted)
               return (
-              <div key={msg.id} className="flex gap-3 items-start">
-                {msg.role === 'agent' ? (
-                  <>
-                    <img src={agentforceIcon} alt="" className="w-9 h-9 rounded-full object-cover object-center shrink-0" />
-                    <div className="flex-1 min-w-0">
+                <div key={msg.id} className="flex gap-3 items-start">
+                  {msg.role === 'agent' ? (
+                    <>
+                      <img src={agentforceIcon} alt="" className="w-9 h-9 rounded-full object-cover object-center shrink-0" />
+                      <div className="flex-1 min-w-0">
                       {msg.showQuote2Link ? (
-                        <p className="text-sm text-gray-800 whitespace-pre-line">
+                          <p className="text-sm text-gray-800 whitespace-pre-line">
                           Thank you for uploading the Purchase Order document. Click{' '}
                           {onNavigateToQuote2 ? (
                             <button type="button" onClick={onNavigateToQuote2} className="text-airtel-red underline hover:text-red-800 focus:outline-none focus:underline">
@@ -1251,13 +1251,13 @@ function AgentforceSidePanel({
                             <span>here</span>
                           )}
                           {' '}to see the updated file.
-                        </p>
+                          </p>
                       ) : msg.showQuoteProposalStatusLink && onNavigateToNewQuoteProposal ? (
-                        <p className="text-sm text-gray-800 whitespace-pre-line">
+                          <p className="text-sm text-gray-800 whitespace-pre-line">
                           Your file is being processed, you will be notified once done, or you can check the status{' '}
                           <button type="button" onClick={onNavigateToNewQuoteProposal} className="text-airtel-red underline hover:text-red-800 focus:outline-none focus:underline">
-                            here
-                          </button>
+                              here
+                            </button>
                           .
                         </p>
                       ) : msg.isAddProductsAnalyzing ? (
@@ -1266,11 +1266,11 @@ function AgentforceSidePanel({
                           <span className="inline-block ml-1 animate-pulse">...</span>
                         </p>
                       ) : msg.showAddedProductsFromExtractedLink && onNavigateToAddedProductsFromExtracted ? (
-                        <p className="text-sm text-gray-800 whitespace-pre-line">
+                          <p className="text-sm text-gray-800 whitespace-pre-line">
                           {ADD_PRODUCTS_RESPONSE_PREFIX}
                           <button type="button" onClick={onNavigateToAddedProductsFromExtracted} className="text-airtel-red underline hover:text-red-800 focus:outline-none focus:underline">
                             {ADD_PRODUCTS_LINK_TEXT}
-                          </button>
+                            </button>
                         </p>
                       ) : msg.isVerifyDetailsAnalyzing ? (
                         <p className="text-sm text-gray-800">
@@ -1413,7 +1413,7 @@ function AgentforceSidePanel({
                                     {msg.bestMatch.keyHighlights.map((h, i) => (
                                       <li key={i}>{h}</li>
                                     ))}
-                                  </ul>
+                            </ul>
                                 </>
                               )}
                             </>
@@ -1427,8 +1427,8 @@ function AgentforceSidePanel({
                                   <p><span className="font-semibold">Account Number</span> : <a href="#" className="text-blue-600 underline hover:text-blue-800 focus:outline-none focus:underline">{msg.additionalOptions[0].accountNumber}</a></p>
                                   <p><span className="font-semibold">Score</span> : {msg.additionalOptions[0].score}</p>
                                   <p><span className="font-semibold">Ranking Reason</span> : {msg.additionalOptions[0].rankingReason}</p>
-                                </div>
-                              )}
+                          </div>
+                        )}
                             </>
                           )}
                           {(msg.accountMatchesRevealPhase ?? 0) >= 3 && msg.additionalOptions?.[1] && (
@@ -1437,7 +1437,7 @@ function AgentforceSidePanel({
                               <p><span className="font-semibold">Account Number</span> : <a href="#" className="text-blue-600 underline hover:text-blue-800 focus:outline-none focus:underline">{msg.additionalOptions[1].accountNumber}</a></p>
                               <p><span className="font-semibold">Score</span> : {msg.additionalOptions[1].score}</p>
                               <p><span className="font-semibold">Ranking Reason</span> : {msg.additionalOptions[1].rankingReason}</p>
-                            </div>
+                                  </div>
                           )}
                           {(msg.accountMatchesRevealPhase ?? 0) >= 4 && msg.additionalOptions?.[2] && (
                             <div className="space-y-1 text-gray-800">
@@ -1445,8 +1445,8 @@ function AgentforceSidePanel({
                               <p><span className="font-semibold">Account Number</span> : <a href="#" className="text-blue-600 underline hover:text-blue-800 focus:outline-none focus:underline">{msg.additionalOptions[2].accountNumber}</a></p>
                               <p><span className="font-semibold">Score</span> : {msg.additionalOptions[2].score}</p>
                               <p><span className="font-semibold">Ranking Reason</span> : {msg.additionalOptions[2].rankingReason}</p>
-                            </div>
-                          )}
+                          </div>
+                        )}
                           {(msg.accountMatchesRevealPhase ?? 0) >= 5 && (
                             <p className="pt-1">Please reply with the number of the account you would like to proceed with</p>
                           )}
@@ -1460,40 +1460,40 @@ function AgentforceSidePanel({
                         <p className="text-sm text-gray-800 whitespace-pre-line">{msg.text}</p>
                       )}
                       {msg.showUploadForm && !hideUploadFormBecauseSubmitted && !(msg.uploadFormType === 'po' && poFormSubmittedRef.current) && !(msg.uploadFormType === 'quoteProposal' && quoteProposalFormSubmittedRef.current) && !(msg.uploadFormType === 'upgradeAttributes' && upgradeAttributesFormSubmittedRef.current) && (
-                        <div className="mt-3 space-y-3">
+                          <div className="mt-3 space-y-3">
                           <p className="text-xs text-gray-700 font-medium">Upload file</p>
-                          <input
-                            ref={uploadFormFileInputRef}
-                            type="file"
-                            accept=".pdf,.csv,.xlsx,application/pdf,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                            className="hidden"
-                            onChange={(e) => {
+                            <input
+                              ref={uploadFormFileInputRef}
+                              type="file"
+                              accept=".pdf,.csv,.xlsx,application/pdf,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                              className="hidden"
+                              onChange={(e) => {
                               const chosen = e.target.files?.[0] || null
                               console.log('[Agentforce Upload] File input onChange – selected file:', chosen?.name ?? null, 'type:', msg.uploadFormType)
                               setUploadFormFile(chosen)
-                            }}
+                              }}
                             aria-label="Upload file"
-                          />
+                            />
                           <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 flex flex-wrap items-center gap-2 bg-grey-bg/50">
-                            <button
-                              type="button"
+                              <button
+                                type="button"
                               onClick={() => {
                                 console.log('[Agentforce Upload] Upload file button clicked (opens file picker), form type:', msg.uploadFormType)
                                 uploadFormFileInputRef.current?.click()
                               }}
                               className="px-4 py-2 rounded-lg border border-airtel-red bg-white text-airtel-red text-xs font-medium hover:bg-grey-bg flex items-center gap-2 focus:outline-none focus:ring-2 focus:ring-airtel-red/20"
-                            >
-                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                              </svg>
+                              >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                                </svg>
                               Upload file
-                            </button>
-                          </div>
-                          {uploadFormFile && (
+                              </button>
+                            </div>
+                            {uploadFormFile && (
                             <p className="text-xs text-gray-700">Selected: {uploadFormFile.name || 'document'}</p>
-                          )}
-                          <button
-                            type="button"
+                            )}
+                            <button
+                              type="button"
                             onClick={() => {
                               console.log('[Agentforce Upload] Submit button clicked, form type:', msg.uploadFormType)
                               if (msg.uploadFormType === 'quoteProposal') handleQuoteProposalUploadSubmit()
@@ -1501,29 +1501,29 @@ function AgentforceSidePanel({
                               else handlePOUploadSubmit()
                             }}
                             className="px-4 py-2 rounded-md bg-airtel-red text-white text-xs font-medium hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
-                          >
-                            Submit
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <div className="w-9 h-9 rounded-full bg-emerald-600 flex items-center justify-center shrink-0">
-                      <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
-                    </div>
-                    <p className="text-sm text-gray-800 flex-1">{msg.text}</p>
-                  </>
-                )}
-              </div>
+                            >
+                              Submit
+                              </button>
+                          </div>
+                        )}
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="w-9 h-9 rounded-full bg-emerald-600 flex items-center justify-center shrink-0">
+                        <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
+                      </div>
+                      <p className="text-sm text-gray-800 flex-1">{msg.text}</p>
+                    </>
+                  )}
+                </div>
             );
           })}
-            <div ref={chatEndRef} />
-        </div>
-      )}
+              <div ref={chatEndRef} />
+          </div>
+        )}
 
-      <div className="shrink-0 p-4 bg-white border-t border-gray-200">
+        <div className="shrink-0 p-4 bg-white border-t border-gray-200">
         <form
           onSubmit={(e) => {
             e.preventDefault()
@@ -1531,21 +1531,21 @@ function AgentforceSidePanel({
           }}
           className="flex items-end gap-2 rounded-lg border border-gray-300 bg-white pl-3 pr-2 py-3 min-h-[4.5rem]"
         >
-          <input
-            type="text"
-            value={chatInput}
-            onChange={(e) => setChatInput(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); sendChatMessage() } }}
+            <input
+              type="text"
+              value={chatInput}
+              onChange={(e) => setChatInput(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); sendChatMessage() } }}
             placeholder="Type your message..."
             className="flex-1 min-w-0 py-2 px-1 text-sm text-gray-800 placeholder-gray-500 focus:outline-none bg-transparent"
-            aria-label="Chat input"
-          />
+              aria-label="Chat input"
+            />
           <button type="submit" className="w-9 h-9 rounded-full flex items-center justify-center text-gray-600 hover:bg-grey-bg focus:outline-none shrink-0 mb-0.5" aria-label="Send message">
             <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" /></svg>
-          </button>
+            </button>
         </form>
-      </div>
-    </aside>
+        </div>
+      </aside>
   )
 }
 

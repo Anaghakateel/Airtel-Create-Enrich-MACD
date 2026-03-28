@@ -683,6 +683,9 @@ function App() {
                     <ConfigurationCartView
                       row={editingSummaryRow}
                       selectedRowIds={selectedSummaryRowIdsForConfig}
+                      summaryLocations={locationsForSummaryTab?.length ? locationsForSummaryTab : locationsForDownstreamTabs}
+                      updatedProductRowIds={summaryUpdatedProductRowIds}
+                      showFeasibilityResults={feasibilityCheckComplete}
                       onBack={() => {
                         setEditingSummaryRow(null)
                         setSelectedSummaryRowIdsForConfig(new Set())

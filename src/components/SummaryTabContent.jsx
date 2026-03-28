@@ -113,14 +113,19 @@ const UPDATED_BADGE = (
   <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold text-black bg-white border border-gray-300 shrink-0 ml-1.5" title="Updated">Updated</span>
 )
 
-function SummaryTabContent({ locations = [], onTotalsChange, onEditRow, showFeasibilityEmptyInitially = false, updatedProductHighlight = null, updatedProductRowIds, showFeasibilityResults = false }) {
+function SummaryTabContent({ locations = [], onTotalsChange, onEditRow, showFeasibilityEmptyInitially = false, updatedProductHighlight = null, updatedProductRowIds, showFeasibilityResults = false, onSelectionChange, embedMode = false, initialSelectedIds, assignedConfigRowIds, onAssignConfigurations, defaultProductFilter }) {
   const updatedRowIdsSet = updatedProductRowIds instanceof Set ? updatedProductRowIds : new Set(updatedProductRowIds || [])
+  const assignedIdsSet = assignedConfigRowIds instanceof Set ? assignedConfigRowIds : new Set(assignedConfigRowIds || [])
+  const showUpdatedForRow = (rowId) => (!embedMode && updatedRowIdsSet.has(rowId)) || (embedMode && assignedIdsSet.has(rowId))
   const summaryRows = useMemo(() => buildSummaryRows(locations, showFeasibilityResults), [locations, showFeasibilityResults])
   const PAGE_SIZE = 10
   const [currentPage, setCurrentPage] = useState(1)
   const [showFeasibilityErrorOnly, setShowFeasibilityErrorOnly] = useState(false)
   const [notificationDismissed, setNotificationDismissed] = useState(false)
-  const [viewBy, setViewBy] = useState('No Grouping')
+  const VIEW_BY_OPTIONS = ['All', 'Show Configured products', 'Show Unconfigured Products']
+  const [viewBy, setViewBy] = useState('All')
+  const [viewByDropdownOpen, setViewByDropdownOpen] = useState(false)
+  const viewByDropdownRef = useRef(null)
   const [displaying, setDisplaying] = useState('All')
   const [searchInput, setSearchInput] = useState('')
   const [searchFilter, setSearchFilter] = useState(null)
@@ -131,12 +136,12 @@ function SummaryTabContent({ locations = [], onTotalsChange, onEditRow, showFeas
   const [deletedIds, setDeletedIds] = useState(() => new Set())
   const [deleteModalRow, setDeleteModalRow] = useState(null)
   const [applyDeleteToSelectedRows, setApplyDeleteToSelectedRows] = useState(false)
-  const [selectedIds, setSelectedIds] = useState(() => new Set())
+  const [selectedIds, setSelectedIds] = useState(() => (initialSelectedIds instanceof Set ? new Set(initialSelectedIds) : new Set(initialSelectedIds || [])))
   const searchAnchorRef = useRef(null)
   const productFilterRef = useRef(null)
   const menuAnchorRef = useRef(null)
   const [filterByOpen, setFilterByOpen] = useState(false)
-  const [productFilter, setProductFilter] = useState(null)
+  const [productFilter, setProductFilter] = useState(() => defaultProductFilter ?? null)
   const [feasibilityFilter, setFeasibilityFilter] = useState(null)
   const [productDropdownOpen, setProductDropdownOpen] = useState(false)
   const [feasibilityDropdownOpen, setFeasibilityDropdownOpen] = useState(false)
@@ -144,25 +149,28 @@ function SummaryTabContent({ locations = [], onTotalsChange, onEditRow, showFeas
   const errorPopoverAnchorRef = useRef(null)
   const errorPopoverCloseTimeoutRef = useRef(null)
   const selectAllCheckboxRef = useRef(null)
-  const summaryResizableCols = useMemo(() => [
-    { id: 'memberGroup', label: 'Member/Group' },
-    { id: 'siteFloor', label: 'Site Floor' },
-    { id: 'media', label: 'Media' },
-    { id: 'maxBandwidth', label: 'Max Bandwidth' },
-    { id: 'tax', label: 'Tax' },
-    { id: 'erpStatus', label: 'ERP Status' },
-    { id: 'quantity', label: 'Quantity' },
-    { id: 'product', label: 'Product' },
-    { id: 'itemCode', label: 'Item Code' },
-    { id: 'arcTotal', label: 'ARC Total' },
-    { id: 'feasibilityStatus', label: 'Feasibility Status' },
-    { id: 'crossConnect', label: 'Cross Connect' },
-    { id: 'circuitId', label: 'Circuit Id' },
-    { id: 'changeRequest', label: 'Change Request' },
-    { id: 'subActivity', label: 'Sub Activity' },
-    { id: 'recurringTotal', label: 'Recurring' },
-    { id: 'oneTimeTotal', label: 'One Time' },
-  ], [])
+  const summaryResizableCols = useMemo(() => {
+    const cols = [
+      { id: 'memberGroup', label: 'Member/Group' },
+      { id: 'siteFloor', label: 'Site Floor' },
+      { id: 'media', label: 'Media' },
+      { id: 'maxBandwidth', label: 'Max Bandwidth' },
+      { id: 'tax', label: 'Tax' },
+      { id: 'erpStatus', label: 'ERP Status' },
+      { id: 'quantity', label: 'Quantity' },
+      { id: 'product', label: 'Product' },
+      { id: 'itemCode', label: 'Item Code' },
+      { id: 'arcTotal', label: 'ARC Total' },
+      { id: 'feasibilityStatus', label: 'Feasibility Status' },
+      { id: 'crossConnect', label: 'Cross Connect' },
+      { id: 'circuitId', label: 'Circuit Id' },
+      { id: 'changeRequest', label: 'Change Request' },
+      { id: 'subActivity', label: 'Sub Activity' },
+      { id: 'recurringTotal', label: 'Recurring' },
+      { id: 'oneTimeTotal', label: 'One Time' },
+    ]
+    return embedMode ? cols.filter((c) => c.id !== 'feasibilityStatus') : cols
+  }, [embedMode])
   const { getColStyle, ResizeHandle } = useResizableColumns(summaryResizableCols)
 
   useEffect(() => {
@@ -212,6 +220,21 @@ function SummaryTabContent({ locations = [], onTotalsChange, onEditRow, showFeas
     setCurrentPage(1)
   }, [productFilter])
 
+  // Close viewBy dropdown when clicking outside
+  useEffect(() => {
+    if (!viewByDropdownOpen) return
+    const handleClickOutside = (e) => {
+      if (viewByDropdownRef.current && !viewByDropdownRef.current.contains(e.target)) {
+        setViewByDropdownOpen(false)
+      }
+    }
+    document.addEventListener('click', handleClickOutside)
+    return () => document.removeEventListener('click', handleClickOutside)
+  }, [viewByDropdownOpen])
+
+  // Reset to page 1 when viewBy changes
+  useEffect(() => setCurrentPage(1), [viewBy])
+
   let rowsToDisplay = summaryRows.filter((r) => !deletedIds.has(r.id))
   if (showFeasibilityErrorOnly) rowsToDisplay = rowsToDisplay.filter((r) => r.feasibilityStatus === 'Failure')
   if (productFilter != null) {
@@ -220,6 +243,11 @@ function SummaryTabContent({ locations = [], onTotalsChange, onEditRow, showFeas
     } else {
       rowsToDisplay = rowsToDisplay.filter((r) => r.product === productFilter)
     }
+  }
+  if (viewBy === 'Show Configured products') {
+    rowsToDisplay = rowsToDisplay.filter((r) => showUpdatedForRow(r.id))
+  } else if (viewBy === 'Show Unconfigured Products') {
+    rowsToDisplay = rowsToDisplay.filter((r) => !showUpdatedForRow(r.id))
   }
 
   const searchSuggestions = useMemo(() => {
@@ -281,6 +309,10 @@ function SummaryTabContent({ locations = [], onTotalsChange, onEditRow, showFeas
   }, [totals.oneTimeTotal, totals.monthlyTotal, totals.quoteTotal, onTotalsChange])
 
   useEffect(() => {
+    if (onSelectionChange) onSelectionChange(selectedIds.size, selectedIds)
+  }, [selectedIds, onSelectionChange])
+
+  useEffect(() => {
     const el = selectAllCheckboxRef.current
     if (!el) return
     const visibleIds = visibleRows.map((r) => r.id)
@@ -302,12 +334,33 @@ function SummaryTabContent({ locations = [], onTotalsChange, onEditRow, showFeas
       <div className="flex flex-wrap items-center justify-between gap-3 p-4 border-b border-gray-200 bg-grey-bg/30">
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-xs text-gray-600">View By</span>
-          <button type="button" className="inline-flex items-center gap-1 px-3 py-1.5 border border-gray-300 rounded-md bg-white text-xs text-gray-700">
-            {viewBy}
-            <svg className="w-4 h-4 text-gray-500" fill="currentColor" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M5.293 7.293a1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
-            </svg>
-          </button>
+          <div className="relative" ref={viewByDropdownRef}>
+            <button
+              type="button"
+              onClick={() => setViewByDropdownOpen((o) => !o)}
+              className="inline-flex items-center gap-1 px-3 py-1.5 border border-gray-300 rounded-md bg-white text-xs text-gray-700 hover:bg-grey-bg/50"
+              aria-expanded={viewByDropdownOpen}
+            >
+              {viewBy}
+              <svg className="w-4 h-4 text-gray-500" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M5.293 7.293a1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+              </svg>
+            </button>
+            {viewByDropdownOpen && (
+              <div className="absolute left-0 top-full mt-1 z-30 min-w-[12rem] py-1 bg-white border border-gray-200 rounded-md shadow-lg">
+                {VIEW_BY_OPTIONS.map((opt) => (
+                  <button
+                    key={opt}
+                    type="button"
+                    onClick={() => { setViewBy(opt); setViewByDropdownOpen(false) }}
+                    className={`w-full text-left px-3 py-2 text-xs hover:bg-grey-bg ${viewBy === opt ? 'text-airtel-red font-medium' : 'text-gray-700'}`}
+                  >
+                    {opt}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
           <span className="text-xs text-gray-600">Displaying</span>
           <button type="button" className="inline-flex items-center gap-1 px-3 py-1.5 border border-gray-300 rounded-md bg-white text-xs text-gray-700">
             {displaying}
@@ -438,21 +491,32 @@ function SummaryTabContent({ locations = [], onTotalsChange, onEditRow, showFeas
                 </div>
               )}
             </div>
-            <button type="button" className="p-1.5 text-gray-500 hover:bg-grey-bg rounded focus:outline-none" aria-label="Delete">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-              </svg>
+            <button
+              type="button"
+              className="px-4 py-1.5 border border-gray-300 rounded-md bg-white text-xs font-medium text-gray-700 hover:bg-grey-bg disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={selectedIds.size === 0}
+              onClick={() => selectedIds.size > 0 && onAssignConfigurations?.(Array.from(selectedIds))}
+            >
+              Assign Configurations
             </button>
-            <button type="button" className="p-1.5 text-gray-500 hover:bg-grey-bg rounded focus:outline-none" aria-label="Edit">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-              </svg>
-            </button>
-            <button type="button" className="px-4 py-1.5 border border-gray-300 rounded-md bg-white text-xs font-medium text-gray-700 hover:bg-grey-bg">Validate</button>
-            <button type="button" className="px-4 py-1.5 border border-gray-300 rounded-md bg-white text-xs font-medium text-gray-700 hover:bg-grey-bg">Enrich Quote</button>
-            <button type="button" className="px-4 py-1.5 border border-gray-300 rounded-md bg-white text-xs font-medium text-gray-700 hover:bg-grey-bg">Upload Documents</button>
-            <button type="button" className="px-4 py-1.5 rounded-md bg-airtel-red text-white text-xs font-medium hover:opacity-90">Manage Solution Bundle</button>
-            <span className="text-xs text-gray-500">View Selected ({selectedIds.size})</span>
+            {!embedMode && (
+              <>
+                <button type="button" className="p-1.5 text-gray-500 hover:bg-grey-bg rounded focus:outline-none" aria-label="Delete">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
+                </button>
+                <button type="button" className="p-1.5 text-gray-500 hover:bg-grey-bg rounded focus:outline-none" aria-label="Edit">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                  </svg>
+                </button>
+                <button type="button" className="px-4 py-1.5 border border-gray-300 rounded-md bg-white text-xs font-medium text-gray-700 hover:bg-grey-bg">Validate</button>
+                <button type="button" className="px-4 py-1.5 border border-gray-300 rounded-md bg-white text-xs font-medium text-gray-700 hover:bg-grey-bg">Enrich Quote</button>
+                <button type="button" className="px-4 py-1.5 border border-gray-300 rounded-md bg-white text-xs font-medium text-gray-700 hover:bg-grey-bg">Upload Documents</button>
+                <button type="button" className="px-4 py-1.5 rounded-md bg-airtel-red text-white text-xs font-medium hover:opacity-90">Manage Solution Bundle</button>
+              </>
+            )}
           </div>
         </div>
 
@@ -460,14 +524,26 @@ function SummaryTabContent({ locations = [], onTotalsChange, onEditRow, showFeas
         <p className="text-gray-600">
           Showing {totalRows === 0 ? '0' : (currentPage - 1) * PAGE_SIZE + 1} - {totalRows === 0 ? '0' : Math.min(currentPage * PAGE_SIZE, totalRows)} of {rowsToDisplay.length} records.
           {showFeasibilityErrorOnly && <span> • Showing only records with feasibility error</span>}
+          {viewBy !== 'All' && <span> • {viewBy}</span>}
           {productFilter != null && <span> • Product: {productFilter}</span>}
           {searchFilter != null && String(searchFilter).trim() !== '' && <span> • Matching search</span>}
         </p>
-        {showFeasibilityErrorOnly ? (
-          <button type="button" onClick={() => setShowFeasibilityErrorOnly(false)} className="text-airtel-red hover:underline font-medium">
+        <div className="flex items-center gap-2">
+          <span className="text-gray-600">View Selected ({selectedIds.size})</span>
+          <button
+            type="button"
+            onClick={() => {
+              setShowFeasibilityErrorOnly(false)
+              setViewBy('All')
+              setProductFilter(null)
+              setSearchFilter(null)
+              setSearchInput('')
+            }}
+            className="text-airtel-red hover:underline font-medium"
+          >
             Show all records
           </button>
-        ) : null}
+        </div>
       </div>
 
       <div className="overflow-x-auto flex flex-col min-h-0" style={{ height: '24rem' }}>
@@ -476,7 +552,7 @@ function SummaryTabContent({ locations = [], onTotalsChange, onEditRow, showFeas
             <colgroup>
               <col className="w-10" />
               {summaryResizableCols.map((c) => <col key={c.id} style={getColStyle(c.id)} />)}
-              <col className="w-9" />
+              {!embedMode && <col className="w-9" />}
             </colgroup>
             <thead className="sticky top-0 z-10 bg-gray-100">
               <tr className="border-b border-gray-200">
@@ -511,14 +587,14 @@ function SummaryTabContent({ locations = [], onTotalsChange, onEditRow, showFeas
                 <th className="px-2 py-3 text-left font-semibold text-gray-900 text-xs truncate group relative" style={getColStyle('product')}><span className="block truncate">Product</span><ResizeHandle columnId="product" /></th>
                 <th className="px-2 py-3 text-left font-semibold text-gray-900 text-xs truncate group relative" style={getColStyle('itemCode')}><span className="block truncate">Item Code</span><ResizeHandle columnId="itemCode" /></th>
                 <th className="px-2 py-3 text-left font-semibold text-gray-900 text-xs truncate group relative" style={getColStyle('arcTotal')}><span className="block truncate">ARC Total</span><ResizeHandle columnId="arcTotal" /></th>
-                <th className="px-2 py-3 text-left font-semibold text-gray-900 text-xs truncate group relative" style={getColStyle('feasibilityStatus')}><span className="block truncate">Feasibility Status</span><ResizeHandle columnId="feasibilityStatus" /></th>
+                {!embedMode && <th className="px-2 py-3 text-left font-semibold text-gray-900 text-xs truncate group relative" style={getColStyle('feasibilityStatus')}><span className="block truncate">Feasibility Status</span><ResizeHandle columnId="feasibilityStatus" /></th>}
                 <th className="px-2 py-3 text-left font-semibold text-gray-900 text-xs truncate group relative" style={getColStyle('crossConnect')}><span className="block truncate">Cross Connect</span><ResizeHandle columnId="crossConnect" /></th>
                 <th className="px-2 py-3 text-left font-semibold text-gray-900 text-xs truncate group relative" style={getColStyle('circuitId')}><span className="block truncate">Circuit Id</span><ResizeHandle columnId="circuitId" /></th>
                 <th className="px-2 py-3 text-left font-semibold text-gray-900 text-xs truncate group relative" style={getColStyle('changeRequest')}><span className="block truncate">Change Request</span><ResizeHandle columnId="changeRequest" /></th>
                 <th className="px-2 py-3 text-left font-semibold text-gray-900 text-xs truncate group relative" style={getColStyle('subActivity')}><span className="block truncate">Sub Activity</span><ResizeHandle columnId="subActivity" /></th>
                 <th className="px-2 py-3 text-left font-semibold text-gray-900 text-xs truncate group relative" style={getColStyle('recurringTotal')}><span className="block truncate">Recurring</span><ResizeHandle columnId="recurringTotal" /></th>
                 <th className="px-2 py-3 text-left font-semibold text-gray-900 text-xs truncate group relative" style={getColStyle('oneTimeTotal')}><span className="block truncate">One Time</span><ResizeHandle columnId="oneTimeTotal" /></th>
-                <th className="w-9 px-2 py-3 shrink-0" aria-label="Row actions" />
+                {!embedMode && <th className="w-9 px-2 py-3 shrink-0" aria-label="Row actions" />}
               </tr>
             </thead>
             <tbody>
@@ -546,7 +622,7 @@ function SummaryTabContent({ locations = [], onTotalsChange, onEditRow, showFeas
                   <td className="px-2 py-3 text-gray-800 align-middle truncate" title={row.memberGroup}>
                     <span className="inline-flex flex-wrap items-center gap-y-1 gap-x-1.5 min-w-0">
                       <span className="truncate">{row.memberGroup || '—'}</span>
-                      {updatedRowIdsSet.has(row.id) && UPDATED_BADGE}
+                      {showUpdatedForRow(row.id) && UPDATED_BADGE}
                     </span>
                   </td>
                   <td className="px-2 py-3 text-gray-500 align-middle truncate">{row.siteFloor}</td>
@@ -559,7 +635,7 @@ function SummaryTabContent({ locations = [], onTotalsChange, onEditRow, showFeas
                     <span className="inline-flex items-center gap-1 min-w-0">
                       {(() => {
                         const hasFeasibilityError = row.feasibilityStatus === 'Failure'
-                        const hasInternetConfigError = row.showInternetConfigError && !updatedRowIdsSet.has(row.id)
+                        const hasInternetConfigError = row.showInternetConfigError && !showUpdatedForRow(row.id)
                         const showError = hasFeasibilityError || hasInternetConfigError
                         const errorMessage = hasFeasibilityError
                           ? (row.errorSummary || 'Error summary in a sentence.')
@@ -600,8 +676,8 @@ function SummaryTabContent({ locations = [], onTotalsChange, onEditRow, showFeas
                         )
                       })()}
                       <span className="truncate">{row.productDisplay ?? row.product}</span>
-                      {updatedRowIdsSet.has(row.id) && UPDATED_BADGE}
-                      {!updatedRowIdsSet.has(row.id) && updatedProductHighlight && row.product === updatedProductHighlight && (
+                      {showUpdatedForRow(row.id) && UPDATED_BADGE}
+                      {!showUpdatedForRow(row.id) && updatedProductHighlight && row.product === updatedProductHighlight && (
                         <span className="shrink-0 inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800 border border-green-300">
                           Updated
                         </span>
@@ -610,19 +686,22 @@ function SummaryTabContent({ locations = [], onTotalsChange, onEditRow, showFeas
                   </td>
                   <td className="px-2 py-3 text-gray-500 align-middle truncate">{row.itemCode}</td>
                   <td className="px-2 py-3 text-gray-800 align-middle truncate">{formatINR(row.arcTotal)}</td>
-                  <td className="px-2 py-3 align-middle">
-                    {showFeasibilityResults ? (
-                      <FeasibilityBadge status={row.feasibilityStatus} />
-                    ) : (
-                      <span className="text-gray-400">—</span>
-                    )}
-                  </td>
+                  {!embedMode && (
+                    <td className="px-2 py-3 align-middle">
+                      {showFeasibilityResults ? (
+                        <FeasibilityBadge status={row.feasibilityStatus} />
+                      ) : (
+                        <span className="text-gray-400">—</span>
+                      )}
+                    </td>
+                  )}
                   <td className="px-2 py-3 text-gray-500 align-middle truncate">{row.crossConnect}</td>
                   <td className="px-2 py-3 text-gray-500 align-middle truncate">{row.circuitId}</td>
                   <td className="px-2 py-3 text-gray-800 align-middle truncate">{row.changeRequest}</td>
                   <td className="px-2 py-3 text-gray-800 align-middle truncate">{row.subActivity}</td>
                   <td className="px-2 py-3 text-gray-800 align-middle truncate">{row.recurringTotal === 0 ? '₹0.00' : formatINR(row.recurringTotal)}</td>
                   <td className="px-2 py-3 text-gray-800 align-middle truncate">{formatINR(row.oneTimeTotal)}</td>
+                  {!embedMode && (
                   <td className="px-2 py-3 align-middle">
                     <div
                       className="relative inline-block"
@@ -643,7 +722,19 @@ function SummaryTabContent({ locations = [], onTotalsChange, onEditRow, showFeas
                         </svg>
                       </button>
                       {openMenuRowId === row.id && (
-                        <div className="absolute right-0 top-full mt-1 z-20 min-w-[6rem] py-1 bg-white border border-gray-300 rounded-lg shadow-sm">
+                        <div className="absolute right-0 top-full mt-1 z-20 min-w-[14rem] py-1 bg-white border border-gray-300 rounded-lg shadow-sm">
+                          <button
+                            type="button"
+                            className="w-full px-3 py-1.5 text-left text-xs text-gray-700 hover:bg-grey-bg"
+                            onClick={() => {
+                              setOpenMenuRowId(null)
+                              const idsToPass = new Set(selectedIds)
+                              if (row?.id) idsToPass.add(row.id)
+                              onEditRow?.(row, idsToPass)
+                            }}
+                          >
+                            Configure & Update Related
+                          </button>
                           <button
                             type="button"
                             className="w-full px-3 py-1.5 text-left text-xs text-gray-700 hover:bg-grey-bg"
@@ -670,6 +761,7 @@ function SummaryTabContent({ locations = [], onTotalsChange, onEditRow, showFeas
                       )}
                     </div>
                   </td>
+                  )}
                 </tr>
               ))}
             </tbody>

@@ -3,18 +3,52 @@
  * Configure Technical attributes | Assign configurations to locations.
  * Supports embedInModal + onClose when shown inside a modal (e.g. from Enrich Quote row overflow).
  */
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import ConfigureTechnicalAttributesContent from './ConfigureTechnicalAttributesContent'
 import LocationsTabContent from './LocationsTabContent'
+
+const CONFIDENCE_LEVEL_OPTIONS = [
+  'Below 30%',
+  '30-50%',
+  '50-70%',
+  '70-85%',
+  'Above 85%',
+]
 
 export default function TechnicalEnrichmentPage({ embedInModal, onClose, onSaveWithConfiguredLocations, compareWithAsset, onCompareWithAssetChange, technicalAttributesOverrides, productFilterLocationIds }) {
   const [technicalSubTab, setTechnicalSubTab] = useState('Configure Technical attributes')
   const [configuredLocationIds, setConfiguredLocationIds] = useState(new Set())
   const [hasConfigureChanges, setHasConfigureChanges] = useState(false)
   const [internalCompareWithAsset, setInternalCompareWithAsset] = useState(false)
+  const [confidenceLevel, setConfidenceLevel] = useState('Below 30%')
+  const [appliedConfidenceLevel, setAppliedConfidenceLevel] = useState('Below 30%')
+  const [confidenceLoading, setConfidenceLoading] = useState(false)
+  const [confidenceDropdownOpen, setConfidenceDropdownOpen] = useState(false)
+  const confidenceDropdownRef = useRef(null)
   const isControlled = compareWithAsset !== undefined
   const compareWithAssetValue = isControlled ? compareWithAsset : internalCompareWithAsset
   const setCompareWithAssetValue = isControlled ? (onCompareWithAssetChange || (() => {})) : setInternalCompareWithAsset
+
+  useEffect(() => {
+    if (!confidenceDropdownOpen) return
+    const handleClickOutside = (event) => {
+      if (confidenceDropdownRef.current && !confidenceDropdownRef.current.contains(event.target)) {
+        setConfidenceDropdownOpen(false)
+      }
+    }
+    document.addEventListener('click', handleClickOutside)
+    return () => document.removeEventListener('click', handleClickOutside)
+  }, [confidenceDropdownOpen])
+
+  useEffect(() => {
+    if (confidenceLevel === appliedConfidenceLevel) return
+    setConfidenceLoading(true)
+    const timer = setTimeout(() => {
+      setAppliedConfidenceLevel(confidenceLevel)
+      setConfidenceLoading(false)
+    }, 2000)
+    return () => clearTimeout(timer)
+  }, [confidenceLevel, appliedConfidenceLevel])
 
   return (
     <div className="flex flex-col min-h-0 flex-1">
@@ -34,32 +68,83 @@ export default function TechnicalEnrichmentPage({ embedInModal, onClose, onSaveW
         </>
       ) : (
         /* Configure tab: card with heading row and content */
-        <div className="flex flex-col flex-1 min-h-0 bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden">
+        <div className="relative flex flex-col flex-1 min-h-0 bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden">
           <div className="px-20 pt-4 pb-2 shrink-0 border-b border-gray-200 flex items-center justify-between gap-4">
             <h2 className="text-base font-semibold text-gray-900">Configure Technical attributes</h2>
-            <div className="flex flex-col items-end">
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-semibold text-gray-800">Compare with Asset</span>
-                <button
-                  type="button"
-                  role="switch"
-                  aria-checked={compareWithAssetValue}
-                  onClick={() => setCompareWithAssetValue(!compareWithAssetValue)}
-                  className={`relative inline-flex h-5 w-10 shrink-0 rounded-full border-2 border-transparent transition-colors focus:outline-none focus:ring-2 focus:ring-airtel-red/20 focus:ring-offset-1 ${compareWithAsset ? 'bg-airtel-red' : 'bg-gray-300'}`}
-                >
-                  <span
-                    className={`pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow ring-0 transition-transform ${compareWithAsset ? 'translate-x-5' : 'translate-x-0.5'}`}
-                  />
-                </button>
+            <div className="flex items-start gap-6">
+              <div className="flex flex-col items-start" ref={confidenceDropdownRef}>
+                <span className="text-xs font-semibold text-gray-800">Confidence Level</span>
+                <div className="relative mt-1">
+                  <button
+                    type="button"
+                    disabled={confidenceLoading}
+                    onClick={() => setConfidenceDropdownOpen((open) => !open)}
+                    className={`inline-flex items-center justify-between min-w-[14rem] px-3 py-1.5 border border-gray-300 rounded-md bg-white text-xs text-gray-800 hover:bg-grey-bg/40 ${confidenceLoading ? 'cursor-not-allowed opacity-70' : ''}`}
+                    aria-expanded={confidenceDropdownOpen}
+                  >
+                    <span>{confidenceLevel}</span>
+                    <svg className="w-4 h-4 text-gray-500" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+                    </svg>
+                  </button>
+                  {confidenceDropdownOpen && (
+                    <div className="absolute right-0 top-full mt-1 z-30 min-w-[14rem] py-1 bg-white border border-gray-200 rounded-md shadow-lg">
+                      {CONFIDENCE_LEVEL_OPTIONS.map((option) => (
+                        <button
+                          key={option}
+                          type="button"
+                          onClick={() => {
+                            setConfidenceLevel(option)
+                            setConfidenceDropdownOpen(false)
+                          }}
+                          className={`w-full text-left px-3 py-2 text-xs hover:bg-grey-bg ${confidenceLevel === option ? 'text-airtel-red font-medium' : 'text-gray-700'}`}
+                        >
+                          {option}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
-              <span className="text-[10px] text-gray-500 mt-0.5">{compareWithAssetValue ? 'Active' : 'Inactive'}</span>
+              <div className="flex flex-col items-end">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-semibold text-gray-800">Compare with Asset</span>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={compareWithAssetValue}
+                    onClick={() => setCompareWithAssetValue(!compareWithAssetValue)}
+                    className={`relative inline-flex h-5 w-10 shrink-0 rounded-full border-2 border-transparent transition-colors focus:outline-none focus:ring-2 focus:ring-airtel-red/20 focus:ring-offset-1 ${compareWithAsset ? 'bg-airtel-red' : 'bg-gray-300'}`}
+                  >
+                    <span
+                      className={`pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow ring-0 transition-transform ${compareWithAsset ? 'translate-x-5' : 'translate-x-0.5'}`}
+                    />
+                  </button>
+                </div>
+                <span className="text-[10px] text-gray-500 mt-0.5">{compareWithAssetValue ? 'Active' : 'Inactive'}</span>
+              </div>
             </div>
           </div>
-          <div className="flex-1 min-h-0 overflow-y-auto p-4 pb-20">
+          <div className="relative flex-1 min-h-0 overflow-y-auto p-4 pb-20">
             <div className="text-sm text-gray-600 px-16">
-              <ConfigureTechnicalAttributesContent onDirtyChange={setHasConfigureChanges} compareWithAsset={compareWithAssetValue} technicalAttributesOverrides={technicalAttributesOverrides} />
+              <ConfigureTechnicalAttributesContent
+                onDirtyChange={setHasConfigureChanges}
+                compareWithAsset={compareWithAssetValue}
+                technicalAttributesOverrides={technicalAttributesOverrides}
+                confidenceLevel={appliedConfidenceLevel}
+              />
             </div>
           </div>
+          {confidenceLoading && (
+            <div className="absolute inset-0 z-40 bg-white/90 flex flex-col items-center justify-start pt-24 gap-3" aria-live="polite">
+              <div className="flex gap-1" aria-hidden="true">
+                {[0, 1, 2, 3, 4].map((i) => (
+                  <span key={i} className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" style={{ animationDelay: `${i * 0.1}s` }} />
+                ))}
+              </div>
+              <p className="text-sm font-semibold text-gray-800">Configuring...</p>
+            </div>
+          )}
         </div>
       )}
 
