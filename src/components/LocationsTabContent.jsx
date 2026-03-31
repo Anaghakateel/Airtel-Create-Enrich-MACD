@@ -9,6 +9,19 @@ function getStreetDisplay(streetAddress) {
   return parts.length >= 2 ? `${parts[0]} ${parts[1]}` : parts[0] || ''
 }
 
+function formatINR(value) {
+  const n = Number(value)
+  if (!Number.isFinite(n)) return '₹0'
+  return `₹${n.toLocaleString('en-IN')}`
+}
+
+function getStableNumericSeed(id, fallback = 0) {
+  const str = String(id ?? fallback)
+  const digits = str.replace(/\D/g, '')
+  if (digits) return Number(digits.slice(-6))
+  return fallback
+}
+
 const PAGE_SIZE = 5
 
 const UPDATED_BADGE = (
@@ -104,6 +117,7 @@ function LocationsTabContent({ locations: locationsProp, configuredLocationIds =
   ]
 
   const configuredSet = configuredLocationIds instanceof Set ? configuredLocationIds : new Set(configuredLocationIds || [])
+  const isTechnicalEnrichmentView = successBannerVariant === 'technicalEnrichment'
 
   const [currentPage, setCurrentPage] = useState(1)
   const [viewBy, setViewBy] = useState('No Grouping')
@@ -116,22 +130,40 @@ function LocationsTabContent({ locations: locationsProp, configuredLocationIds =
   const [deleteModalRow, setDeleteModalRow] = useState(null)
   const [applyDeleteToSelectedRows, setApplyDeleteToSelectedRows] = useState(false)
   const selectAllCheckboxRef = useRef(null)
-  const locationsResizableCols = useMemo(() => [
-    { id: 'offerAssigned', label: 'Offer Assigned' },
-    { id: 'streetAddress', label: 'Street Address' },
-    { id: 'floorNo', label: 'Floor No' },
-    { id: 'flatNo', label: 'Flat No' },
-    { id: 'city', label: 'City' },
-    { id: 'state', label: 'State' },
-    { id: 'country', label: 'Country' },
-    { id: 'premises', label: 'Premises' },
-    { id: 'postalCode', label: 'Postal Code' },
-    { id: 'servicePoint', label: 'Service Point' },
-    { id: 'locationType', label: 'Location Type' },
-    { id: 'solutionType', label: 'Solution Type' },
-    { id: 'circle', label: 'Circle' },
-    { id: 'source', label: 'Source' },
-  ], [])
+  const locationsResizableCols = useMemo(() => {
+    if (isTechnicalEnrichmentView) {
+      return [
+        { id: 'member', label: 'Member' },
+        { id: 'product', label: 'Product' },
+        { id: 'media', label: 'Media' },
+        { id: 'serviceType', label: 'Service Type' },
+        { id: 'lsi', label: 'LSI' },
+        { id: 'quantity', label: 'Quantity' },
+        { id: 'feasibility', label: 'Feasibility' },
+        { id: 'crossConnectRequired', label: 'Cross Connect Required' },
+        { id: 'ddosRequired', label: 'DDoS Required' },
+        { id: 'oneTime', label: 'One Time' },
+        { id: 'recurring', label: 'Recurring' },
+        { id: 'arcTotal', label: 'ARC Total' },
+      ]
+    }
+    return [
+      { id: 'offerAssigned', label: 'Offer Assigned' },
+      { id: 'streetAddress', label: 'Street Address' },
+      { id: 'floorNo', label: 'Floor No' },
+      { id: 'flatNo', label: 'Flat No' },
+      { id: 'city', label: 'City' },
+      { id: 'state', label: 'State' },
+      { id: 'country', label: 'Country' },
+      { id: 'premises', label: 'Premises' },
+      { id: 'postalCode', label: 'Postal Code' },
+      { id: 'servicePoint', label: 'Service Point' },
+      { id: 'locationType', label: 'Location Type' },
+      { id: 'solutionType', label: 'Solution Type' },
+      { id: 'circle', label: 'Circle' },
+      { id: 'source', label: 'Source' },
+    ]
+  }, [isTechnicalEnrichmentView])
   const { getColStyle, ResizeHandle } = useResizableColumns(locationsResizableCols)
 
   const filteredByViewBy =
@@ -167,6 +199,30 @@ function LocationsTabContent({ locations: locationsProp, configuredLocationIds =
   const onViewByChange = (value) => {
     setViewBy(value)
     setCurrentPage(1)
+  }
+
+  const getTechnicalRowValues = (loc, absoluteIndex) => {
+    const productCycle = ['Internet', 'MPLS', 'SD WAN']
+    const mediaCycle = ['50 Mbps', '100 Mbps', '200 Mbps']
+    const serviceTypeCycle = ['Unmanaged', 'Partially Managed', 'Managed']
+    const seed = getStableNumericSeed(loc.id, absoluteIndex + 1)
+    const oneTime = Number(loc.oneTimeTotal ?? loc.oneTimeCharge ?? (45000 + (seed % 5) * 5000))
+    const recurring = Number(loc.recurringTotal ?? loc.monthlyTotal ?? (2500 + (seed % 4) * 750))
+    const arcTotal = Number(loc.arcTotal ?? recurring * 12)
+    return {
+      member: loc.streetAddress || [loc.city, loc.state, loc.country || 'India'].filter(Boolean).join(', '),
+      product: loc.product || productCycle[absoluteIndex % productCycle.length],
+      media: loc.maxBandwidth || loc.bandwidth || mediaCycle[absoluteIndex % mediaCycle.length],
+      serviceType: loc.serviceType || serviceTypeCycle[absoluteIndex % serviceTypeCycle.length],
+      lsi: loc.lsi || `80002301259${String(100 + (seed % 900))}`,
+      quantity: loc.quantity ?? 1,
+      feasibility: loc.feasibilityId || `FZ-${String(1000 + (seed % 9000))}`,
+      crossConnectRequired: loc.crossConnectRequired ?? ((absoluteIndex + seed) % 2 === 0 ? 'Yes' : 'No'),
+      ddosRequired: loc.ddosRequired ?? ((absoluteIndex + seed + 1) % 2 === 0 ? 'Yes' : 'No'),
+      oneTime: formatINR(oneTime),
+      recurring: formatINR(recurring),
+      arcTotal: formatINR(arcTotal),
+    }
   }
 
   useEffect(() => {
@@ -233,23 +289,16 @@ function LocationsTabContent({ locations: locationsProp, configuredLocationIds =
                   ? `Technical attributes updates were successfully applied to ${selectedCount} location${selectedCount === 1 ? '' : 's'}`
                   : `${selectedCount} location${selectedCount === 1 ? '' : 's'} were successfully configured`
                 setSuccessMessage(msg)
+                setSelectedIds(new Set())
+                setViewingSelectedOnly(false)
               }}
               className={selectedCount > 0
                 ? 'px-3 py-1.5 border border-gray-300 rounded-md bg-white text-airtel-red text-xs font-medium hover:bg-grey-bg focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:opacity-50 disabled:cursor-not-allowed'
                 : 'px-3 py-1.5 border border-gray-300 rounded-md bg-gray-100 text-gray-500 text-xs font-medium cursor-not-allowed'}
             >
-              Add Configurations to locations
+              Apply Configurations
             </button>
           )}
-          <button
-            type="button"
-            className="p-1.5 text-gray-500 hover:bg-grey-bg rounded focus:outline-none"
-            aria-label="Delete"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-            </svg>
-          </button>
         </div>
       </div>
 
@@ -356,33 +405,27 @@ function LocationsTabContent({ locations: locationsProp, configuredLocationIds =
                     }}
                   />
                 </th>
-                <th className="px-2 py-4 text-left font-semibold text-gray-900 group relative" style={getColStyle('offerAssigned')}><span className="block truncate">Offer Assigned</span><ResizeHandle columnId="offerAssigned" /></th>
-                <th className="px-2 py-4 text-left font-semibold text-gray-900 group relative" style={getColStyle('streetAddress')}><span className="block truncate">Street Address</span><ResizeHandle columnId="streetAddress" /></th>
-                <th className="px-2 py-4 text-left font-semibold text-gray-900 group relative" style={getColStyle('floorNo')}><span className="block truncate">Floor No</span><ResizeHandle columnId="floorNo" /></th>
-                <th className="px-2 py-4 text-left font-semibold text-gray-900 group relative" style={getColStyle('flatNo')}><span className="block truncate">Flat No</span><ResizeHandle columnId="flatNo" /></th>
-                <th className="px-2 py-4 text-left font-semibold text-gray-900 group relative" style={getColStyle('city')}><span className="block truncate">City</span><ResizeHandle columnId="city" /></th>
-                <th className="px-2 py-4 text-left font-semibold text-gray-900 group relative" style={getColStyle('state')}><span className="block truncate">State</span><ResizeHandle columnId="state" /></th>
-                <th className="px-2 py-4 text-left font-semibold text-gray-900 group relative" style={getColStyle('country')}><span className="block truncate">Country</span><ResizeHandle columnId="country" /></th>
-                <th className="px-2 py-4 text-left font-semibold text-gray-900 group relative" style={getColStyle('premises')}><span className="block truncate">Premises</span><ResizeHandle columnId="premises" /></th>
-                <th className="px-2 py-4 text-left font-semibold text-gray-900 group relative" style={getColStyle('postalCode')}><span className="block truncate">Postal Code</span><ResizeHandle columnId="postalCode" /></th>
-                <th className="px-2 py-4 text-left font-semibold text-gray-900 group relative" style={getColStyle('servicePoint')}><span className="block truncate">Service Point</span><ResizeHandle columnId="servicePoint" /></th>
-                <th className="px-2 py-4 text-left font-semibold text-gray-900 group relative" style={getColStyle('locationType')}><span className="block truncate">Location Type</span><ResizeHandle columnId="locationType" /></th>
-                <th className="px-2 py-4 text-left font-semibold text-gray-900 group relative" style={getColStyle('solutionType')}><span className="block truncate">Solution Type</span><ResizeHandle columnId="solutionType" /></th>
-                <th className="px-2 py-4 text-left font-semibold text-gray-900 group relative" style={getColStyle('circle')}><span className="block truncate">Circle</span><ResizeHandle columnId="circle" /></th>
-                <th className="px-2 py-4 text-left font-semibold text-gray-900 group relative" style={getColStyle('source')}><span className="block truncate">Source</span><ResizeHandle columnId="source" /></th>
+                {locationsResizableCols.map((col) => (
+                  <th key={col.id} className="px-2 py-4 text-left font-semibold text-gray-900 group relative" style={getColStyle(col.id)}>
+                    <span className="block truncate">{col.label}</span>
+                    <ResizeHandle columnId={col.id} />
+                  </th>
+                ))}
               </tr>
             </thead>
             <tbody>
               {visibleLocations.length === 0 ? (
                 <tr>
-                  <td colSpan={15} className="px-4 py-8 text-center text-gray-500">
+                  <td colSpan={locationsResizableCols.length + 1} className="px-4 py-8 text-center text-gray-500">
                     No locations to display.
                   </td>
                 </tr>
               ) : (
-                visibleLocations.map((loc) => {
+                visibleLocations.map((loc, idx) => {
                   const streetDisplay = getStreetDisplay(loc.streetAddress)
                   const cellClass = 'px-2 py-4 text-gray-800 align-middle leading-relaxed min-h-[7rem]'
+                  const absoluteIndex = (currentPage - 1) * PAGE_SIZE + idx
+                  const technicalRow = getTechnicalRowValues(loc, absoluteIndex)
                   return (
                     <tr
                       key={loc.id}
@@ -404,30 +447,54 @@ function LocationsTabContent({ locations: locationsProp, configuredLocationIds =
                           }}
                         />
                       </td>
-                      <td className="px-2 py-4 text-gray-800 align-middle min-h-[7rem]">
-                        {loc.productsAssigned !== false ? (
-                          <span className="inline-flex items-center justify-center w-3 h-3 rounded-full bg-green-700 text-white shrink-0" aria-label="Offer assigned" title="Products assigned">
-                            <svg className="w-2 h-2" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                            </svg>
-                          </span>
-                        ) : (
-                          '—'
-                        )}
-                      </td>
-                      <EditableCell loc={loc} field="streetAddress" displayValue={streetDisplay} onUpdate={onUpdateLocation} className={`${cellClass} min-w-[14rem]`} showUpdatedBadge={configuredSet.has(loc.id)} />
-                      <EditableCell loc={loc} field="floorNo" displayValue={loc.floorNo ?? ''} onUpdate={onUpdateLocation} className={cellClass} />
-                      <EditableCell loc={loc} field="flatNo" displayValue={loc.flatNo ?? ''} onUpdate={onUpdateLocation} className={cellClass} />
-                      <EditableCell loc={loc} field="city" displayValue={loc.city ?? ''} onUpdate={onUpdateLocation} className={cellClass} />
-                      <EditableCell loc={loc} field="state" displayValue={loc.state ?? ''} onUpdate={onUpdateLocation} className={cellClass} />
-                      <EditableCell loc={loc} field="country" displayValue={loc.country || 'India'} onUpdate={onUpdateLocation} className={cellClass} />
-                      <EditableCell loc={loc} field="premises" displayValue={loc.premises ?? ''} onUpdate={onUpdateLocation} className={cellClass} />
-                      <EditableCell loc={loc} field="postalCode" displayValue={loc.postalCode ?? ''} onUpdate={onUpdateLocation} className={cellClass} />
-                      <EditableCell loc={loc} field="servicePoint" displayValue={loc.servicePoint ?? ''} onUpdate={onUpdateLocation} className={cellClass} />
-                      <EditableCell loc={loc} field="locationType" displayValue={loc.locationType ?? ''} onUpdate={onUpdateLocation} className={cellClass} />
-                      <EditableCell loc={loc} field="solutionType" displayValue={loc.solutionType ?? ''} onUpdate={onUpdateLocation} className={cellClass} />
-                      <EditableCell loc={loc} field="circle" displayValue={loc.circle ?? ''} onUpdate={onUpdateLocation} className={cellClass} />
-                      <td className="px-2 py-4 text-gray-800 align-middle text-gray-600 leading-relaxed min-h-[7rem]" title="Read only">{loc.source === 'File Uploaded' || loc.source === 'File Upload' ? 'File Uploaded' : (loc.source || 'AI Extracted')}</td>
+                      {isTechnicalEnrichmentView ? (
+                        <>
+                          <td className={`${cellClass} min-w-[18rem]`}>{technicalRow.member || '—'}</td>
+                          <td className={cellClass}>
+                            <span className="inline-flex flex-wrap items-center gap-y-1">
+                              <span>{technicalRow.product || '—'}</span>
+                              {configuredSet.has(loc.id) && UPDATED_BADGE}
+                            </span>
+                          </td>
+                          <td className={cellClass}>{technicalRow.media || '—'}</td>
+                          <td className={cellClass}>{technicalRow.serviceType || '—'}</td>
+                          <td className={cellClass}>{technicalRow.lsi || '—'}</td>
+                          <td className={cellClass}>{technicalRow.quantity ?? '—'}</td>
+                          <td className={cellClass}>{technicalRow.feasibility || '—'}</td>
+                          <td className={cellClass}>{technicalRow.crossConnectRequired || '—'}</td>
+                          <td className={cellClass}>{technicalRow.ddosRequired || '—'}</td>
+                          <td className={cellClass}>{technicalRow.oneTime || '—'}</td>
+                          <td className={cellClass}>{technicalRow.recurring || '—'}</td>
+                          <td className={cellClass}>{technicalRow.arcTotal || '—'}</td>
+                        </>
+                      ) : (
+                        <>
+                          <td className="px-2 py-4 text-gray-800 align-middle min-h-[7rem]">
+                            {loc.productsAssigned !== false ? (
+                              <span className="inline-flex items-center justify-center w-3 h-3 rounded-full bg-green-700 text-white shrink-0" aria-label="Offer assigned" title="Products assigned">
+                                <svg className="w-2 h-2" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                </svg>
+                              </span>
+                            ) : (
+                              '—'
+                            )}
+                          </td>
+                          <EditableCell loc={loc} field="streetAddress" displayValue={streetDisplay} onUpdate={onUpdateLocation} className={`${cellClass} min-w-[14rem]`} showUpdatedBadge={configuredSet.has(loc.id)} />
+                          <EditableCell loc={loc} field="floorNo" displayValue={loc.floorNo ?? ''} onUpdate={onUpdateLocation} className={cellClass} />
+                          <EditableCell loc={loc} field="flatNo" displayValue={loc.flatNo ?? ''} onUpdate={onUpdateLocation} className={cellClass} />
+                          <EditableCell loc={loc} field="city" displayValue={loc.city ?? ''} onUpdate={onUpdateLocation} className={cellClass} />
+                          <EditableCell loc={loc} field="state" displayValue={loc.state ?? ''} onUpdate={onUpdateLocation} className={cellClass} />
+                          <EditableCell loc={loc} field="country" displayValue={loc.country || 'India'} onUpdate={onUpdateLocation} className={cellClass} />
+                          <EditableCell loc={loc} field="premises" displayValue={loc.premises ?? ''} onUpdate={onUpdateLocation} className={cellClass} />
+                          <EditableCell loc={loc} field="postalCode" displayValue={loc.postalCode ?? ''} onUpdate={onUpdateLocation} className={cellClass} />
+                          <EditableCell loc={loc} field="servicePoint" displayValue={loc.servicePoint ?? ''} onUpdate={onUpdateLocation} className={cellClass} />
+                          <EditableCell loc={loc} field="locationType" displayValue={loc.locationType ?? ''} onUpdate={onUpdateLocation} className={cellClass} />
+                          <EditableCell loc={loc} field="solutionType" displayValue={loc.solutionType ?? ''} onUpdate={onUpdateLocation} className={cellClass} />
+                          <EditableCell loc={loc} field="circle" displayValue={loc.circle ?? ''} onUpdate={onUpdateLocation} className={cellClass} />
+                          <td className="px-2 py-4 text-gray-800 align-middle text-gray-600 leading-relaxed min-h-[7rem]" title="Read only">{loc.source === 'File Uploaded' || loc.source === 'File Upload' ? 'File Uploaded' : (loc.source || 'AI Extracted')}</td>
+                        </>
+                      )}
                     </tr>
                   )
                 })

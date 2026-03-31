@@ -143,6 +143,7 @@ function App() {
   const [technicalAttributesUpdateIntent, setTechnicalAttributesUpdateIntent] = useState(null)
   const [technicalAttributesOverrides, setTechnicalAttributesOverrides] = useState(null)
   const [technicalAttributesConfiguredLocationIds, setTechnicalAttributesConfiguredLocationIds] = useState(() => new Set())
+  const [technicalAttributesShouldAutofill, setTechnicalAttributesShouldAutofill] = useState(false)
   const [hasMacdUpgradeUpdateNotification, setHasMacdUpgradeUpdateNotification] = useState(false)
   const [macdUpgradeUpdateInProgress, setMacdUpgradeUpdateInProgress] = useState(false)
   const macdUpgradeUpdateIntentRef = useRef(null)
@@ -888,6 +889,7 @@ function App() {
                 onCompareWithAssetChange={setCompareWithAsset}
                 technicalAttributesOverrides={technicalAttributesOverrides}
                 productFilterLocationIds={technicalAttributesInternetLocationIds}
+                autoFillValues={technicalAttributesShouldAutofill}
                 onBackToEnrichQuote={() => {
                   setShowTechnicalAttributesPage(false)
                   setCompareWithAsset(false)
@@ -902,13 +904,18 @@ function App() {
                   setEnrichQuoteUpdateIntent(null)
                   setTechnicalAttributesOverrides(null)
                   setTechnicalAttributesConfiguredLocationIds(new Set())
+                  setTechnicalAttributesShouldAutofill(false)
                 }}
               />
             ) : showEnrichQuotePage ? (
               <SelectQuoteLineItemsPage
                 onBack={() => { setShowEnrichQuotePage(false); setEnrichQuoteUpdateIntent(null); setTechnicalAttributesConfiguredLocationIds(new Set()) }}
                 quote1Locations={locationsForSummaryTab?.length ? locationsForSummaryTab : locationsForDownstreamTabs}
-                onTechnicalAttributesClick={() => setShowTechnicalAttributesPage(true)}
+                onTechnicalAttributesClick={(row) => {
+                  const technicalAttributesValue = (row?.technicalAttributes || '').toString().trim().toLowerCase()
+                  setTechnicalAttributesShouldAutofill(technicalAttributesValue === 'autofilled')
+                  setShowTechnicalAttributesPage(true)
+                }}
                 enrichQuoteUpdateIntent={enrichQuoteUpdateIntent}
                 technicalAttributesConfiguredLocationIds={technicalAttributesConfiguredLocationIds}
               />

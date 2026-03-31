@@ -43,6 +43,7 @@ function buildLineItemsFromQuote1(locations) {
       quantity: 1,
       billingContactPerson: BILLING_CONTACT_NAMES[i % BILLING_CONTACT_NAMES.length],
       gstApplicable: 'Billing GST',
+      technicalAttributes: i % 2 === 0 ? 'Autofilled' : 'Yet to fill',
       billingDetailsSummary: BILLING_LEVELS[i % BILLING_LEVELS.length],
       billingLegalEntity: BILLING_LEGAL_ENTITIES[i % BILLING_LEGAL_ENTITIES.length],
       billingBillDetailsType: BILLING_DETAILS_TYPES[i % 2],
@@ -87,6 +88,7 @@ function getFallbackLineItems() {
       quantity: 1,
       billingContactPerson: BILLING_CONTACT_NAMES[(i - 1) % BILLING_CONTACT_NAMES.length],
       gstApplicable: ['Billing GST', 'Delivery GST'][(i - 1) % 2],
+      technicalAttributes: (i - 1) % 2 === 0 ? 'Autofilled' : 'Yet to fill',
       billingDetailsSummary: BILLING_LEVELS[(i - 1) % BILLING_LEVELS.length],
       billingLegalEntity: BILLING_LEGAL_ENTITIES[(i - 1) % BILLING_LEGAL_ENTITIES.length],
       billingBillDetailsType: BILLING_DETAILS_TYPES[(i - 1) % 2],
@@ -139,6 +141,8 @@ const INVOICE_SHIPPING_OPTIONS = [
 ]
 const GST_APPLICABLE_LABEL = 'GST app'
 const GST_OPTIONS = ['Billing GST', 'Delivery GST']
+const TECHNICAL_ATTRIBUTES_LABEL = 'Technical Attributes'
+const TECHNICAL_ATTRIBUTES_FILTER_OPTIONS = ['Autofilled', 'Yet to fill']
 
 const ALWAYS_VISIBLE_COLUMN_KEYS = ['lastEnrichedDate', 'lsi', 'lineNumber', 'address', 'state', 'productName']
 const COLUMN_FILTER_OPTIONS = [
@@ -151,6 +155,7 @@ const COLUMN_FILTER_OPTIONS = [
   { key: 'poGroup', label: 'PO Group' },
   { key: 'invoiceShippingDetails', label: 'Invoice Shipping Details' },
   { key: 'gstApplicable', label: 'GST applicable' },
+  { key: 'technicalAttributes', label: 'Technical Attributes' },
 ]
 const COLUMN_FILTER_KEYS = COLUMN_FILTER_OPTIONS.filter((o) => o.key !== 'all').map((o) => o.key)
 
@@ -263,8 +268,11 @@ export default function SelectQuoteLineItemsPage({ onBack, quote1Locations = [],
   const [currentPage, setCurrentPage] = useState(1)
   const [filterState, setFilterState] = useState(FILTER_ALL)
   const [filterProduct, setFilterProduct] = useState(FILTER_ALL)
+  const [filterTechnicalAttributes, setFilterTechnicalAttributes] = useState(FILTER_ALL)
+  const [filterByOpen, setFilterByOpen] = useState(false)
   const [visibleColumnKeys, setVisibleColumnKeys] = useState(() => new Set(COLUMN_FILTER_KEYS))
   const [columnFilterOpen, setColumnFilterOpen] = useState(false)
+  const filterByRef = useRef(null)
   const columnFilterAnchorRef = useRef(null)
   const columnFilterPopoverRef = useRef(null)
   const [searchQuery, setSearchQuery] = useState('')
@@ -374,6 +382,7 @@ export default function SelectQuoteLineItemsPage({ onBack, quote1Locations = [],
     ...PO_SUB_COLUMNS.map((s) => ({ id: `po_${s.key}`, label: s.label })),
     { id: 'invoiceShippingDetails', label: INVOICE_SHIPPING_LABEL },
     { id: 'gstApplicable', label: GST_APPLICABLE_LABEL },
+    { id: 'technicalAttributes', label: TECHNICAL_ATTRIBUTES_LABEL },
   ], [])
   const { getColStyle, ResizeHandle } = useResizableColumns(enrichResizableCols)
   const lastEnrichQuoteUpdateIntentRef = useRef(null)
@@ -512,12 +521,19 @@ export default function SelectQuoteLineItemsPage({ onBack, quote1Locations = [],
   const effectiveFilterState = filterState === FILTER_ALL || stateOptions.includes(filterState) ? filterState : FILTER_ALL
   const effectiveFilterProduct =
     filterProduct === FILTER_ALL || productOptions.includes(filterProduct) ? filterProduct : FILTER_ALL
+  const effectiveFilterTechnicalAttributes =
+    filterTechnicalAttributes === FILTER_ALL || TECHNICAL_ATTRIBUTES_FILTER_OPTIONS.includes(filterTechnicalAttributes)
+      ? filterTechnicalAttributes
+      : FILTER_ALL
 
   const filteredItems = useMemo(() => {
     let list = allLineItems.filter((r) => !deletedIds.has(r.id))
     if (effectiveFilterState !== FILTER_ALL) list = list.filter((r) => r.state === effectiveFilterState)
     if (effectiveFilterProduct !== FILTER_ALL)
       list = list.filter((r) => (getCellValue(r, 'productName') || '').toLowerCase().includes(effectiveFilterProduct.toLowerCase()))
+    if (effectiveFilterTechnicalAttributes !== FILTER_ALL) {
+      list = list.filter((r) => (getCellValue(r, 'technicalAttributes') || r.technicalAttributes || '') === effectiveFilterTechnicalAttributes)
+    }
     const q = searchQuery.trim().toLowerCase()
     if (q) {
       list = list.filter((r) => {
@@ -529,7 +545,7 @@ export default function SelectQuoteLineItemsPage({ onBack, quote1Locations = [],
       })
     }
     return list
-  }, [allLineItems, deletedIds, effectiveFilterState, effectiveFilterProduct, searchQuery, cellEdits])
+  }, [allLineItems, deletedIds, effectiveFilterState, effectiveFilterProduct, effectiveFilterTechnicalAttributes, searchQuery, cellEdits])
 
   const displayFilteredItems = useMemo(() => {
     if (viewingSelectedOnly && selectedIds.size > 0) {
@@ -789,6 +805,17 @@ export default function SelectQuoteLineItemsPage({ onBack, quote1Locations = [],
   }, [openRowMenuId])
 
   useEffect(() => {
+    if (!filterByOpen) return
+    const handleClickOutside = (e) => {
+      if (filterByRef.current && !filterByRef.current.contains(e.target)) {
+        setFilterByOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [filterByOpen])
+
+  useEffect(() => {
     if (!billingDetailsModalRow) return
     setBillingDetailsValidationErrors({})
     setBillingModalLevel(getCellValue(billingDetailsModalRow, 'billingDetailsSummary') || billingDetailsModalRow.billingDetailsSummary || 'Account Level')
@@ -838,33 +865,74 @@ export default function SelectQuoteLineItemsPage({ onBack, quote1Locations = [],
           <h2 className="text-base font-semibold text-gray-900">Enrich Quote</h2>
         </div>
 
-        {/* Filter by State, Filter by Product, Search this list (search on right) */}
+        {/* Filter by (single popover), Search this list (search on right) */}
         <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-3 bg-white border-t border-gray-100">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-xs text-gray-700">Filter by State</span>
-            <select
-              value={effectiveFilterState}
-              onChange={(e) => setFilterState(e.target.value)}
-              className="px-2 py-1.5 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-airtel-red/30"
-              aria-label="Filter by State"
-            >
-              <option value={FILTER_ALL}>All</option>
-              {stateOptions.map((s) => (
-                <option key={s} value={s}>{s}</option>
-              ))}
-            </select>
-            <span className="text-xs text-gray-700 ml-2">Filter by Product</span>
-            <select
-              value={effectiveFilterProduct}
-              onChange={(e) => setFilterProduct(e.target.value)}
-              className="px-2 py-1.5 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-airtel-red/30"
-              aria-label="Filter by Product"
-            >
-              <option value={FILTER_ALL}>All</option>
-              {productOptions.map((p) => (
-                <option key={p} value={p}>{p}</option>
-              ))}
-            </select>
+            <span className="text-xs text-gray-700">Filter by</span>
+            <div className="relative" ref={filterByRef}>
+              <button
+                type="button"
+                onClick={() => setFilterByOpen((open) => !open)}
+                className="inline-flex items-center justify-between gap-2 px-3 py-1.5 text-xs border border-gray-300 rounded bg-white focus:outline-none focus:ring-1 focus:ring-airtel-red/30 min-w-[6rem]"
+                aria-label="Filter by"
+                aria-expanded={filterByOpen}
+              >
+                <span>
+                  {effectiveFilterState === FILTER_ALL && effectiveFilterProduct === FILTER_ALL && effectiveFilterTechnicalAttributes === FILTER_ALL ? 'All' : 'Filtered'}
+                </span>
+                <svg className="w-3.5 h-3.5 text-gray-500 shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+                </svg>
+              </button>
+              {filterByOpen && (
+                <div className="absolute left-0 top-full mt-1 z-50 w-72 p-3 bg-white border border-gray-200 rounded-lg shadow-lg">
+                  <div className="space-y-3">
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-700 mb-1">State</label>
+                      <select
+                        value={effectiveFilterState}
+                        onChange={(e) => setFilterState(e.target.value)}
+                        className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-airtel-red/30"
+                        aria-label="Filter by State"
+                      >
+                        <option value={FILTER_ALL}>All States</option>
+                        {stateOptions.map((s) => (
+                          <option key={s} value={s}>{s}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-700 mb-1">Products</label>
+                      <select
+                        value={effectiveFilterProduct}
+                        onChange={(e) => setFilterProduct(e.target.value)}
+                        className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-airtel-red/30"
+                        aria-label="Filter by Product"
+                      >
+                        <option value={FILTER_ALL}>All Products</option>
+                        {productOptions.map((p) => (
+                          <option key={p} value={p}>{p}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-700 mb-1">Technical Attributes</label>
+                      <select
+                        value={effectiveFilterTechnicalAttributes}
+                        onChange={(e) => setFilterTechnicalAttributes(e.target.value)}
+                        className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-airtel-red/30"
+                        aria-label="Filter by Technical Attributes"
+                      >
+                        <option value={FILTER_ALL}>All</option>
+                        {TECHNICAL_ATTRIBUTES_FILTER_OPTIONS.map((value) => (
+                          <option key={value} value={value}>{value}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
             <span className="text-xs text-gray-700 ml-2">Displaying</span>
             <div className="relative inline-block" ref={columnFilterAnchorRef}>
               <button
@@ -955,8 +1023,9 @@ export default function SelectQuoteLineItemsPage({ onBack, quote1Locations = [],
             {' '}
             {selectedIds.size} Records selected
             {'. '}
-            Filter by State: {effectiveFilterState}.
-            Filter by Product: {effectiveFilterProduct}.
+            {effectiveFilterState !== FILTER_ALL && <>Filter by State: {effectiveFilterState}. </>}
+            {effectiveFilterProduct !== FILTER_ALL && <>Filter by Product: {effectiveFilterProduct}. </>}
+            {effectiveFilterTechnicalAttributes !== FILTER_ALL && <>Filter by Technical Attributes: {effectiveFilterTechnicalAttributes}. </>}
             Displaying: {visibleColumnKeys.size === 0 || visibleColumnKeys.size === COLUMN_FILTER_KEYS.length ? 'All' : `${visibleColumnKeys.size} column${visibleColumnKeys.size === 1 ? '' : 's'}`}.
           </div>
           <div className="flex items-center gap-x-1 shrink-0">
@@ -998,6 +1067,7 @@ export default function SelectQuoteLineItemsPage({ onBack, quote1Locations = [],
               {showColumn('poGroup') && (poDetailsExpanded ? PO_SUB_COLUMNS.map((s) => <col key={s.key} style={getColStyle(`po_${s.key}`)} />) : <col style={getColStyle('poGroup')} />)}
               {showColumn('invoiceShippingDetails') && <col style={getColStyle('invoiceShippingDetails')} />}
               {showColumn('gstApplicable') && <col style={getColStyle('gstApplicable')} />}
+              {showColumn('technicalAttributes') && <col style={getColStyle('technicalAttributes')} />}
               <col className="w-8" />
             </colgroup>
             <thead className="bg-gray-50">
@@ -1081,6 +1151,12 @@ export default function SelectQuoteLineItemsPage({ onBack, quote1Locations = [],
                 <th rowSpan={2} className="text-left font-medium text-gray-700 py-1 px-2 border-b border-r border-gray-200 whitespace-nowrap align-top group relative" style={getColStyle('gstApplicable')}>
                   <span className="inline-flex items-center gap-0.5">{GST_APPLICABLE_LABEL}<svg className="w-3.5 h-3.5 text-gray-400" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" /></svg></span>
                   <ResizeHandle columnId="gstApplicable" />
+                </th>
+                )}
+                {showColumn('technicalAttributes') && (
+                <th rowSpan={2} className="text-left font-medium text-gray-700 py-1 px-2 border-b border-r border-gray-200 whitespace-nowrap align-top group relative" style={getColStyle('technicalAttributes')}>
+                  <span className="inline-flex items-center gap-0.5">{TECHNICAL_ATTRIBUTES_LABEL}<svg className="w-3.5 h-3.5 text-gray-400" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" /></svg></span>
+                  <ResizeHandle columnId="technicalAttributes" />
                 </th>
                 )}
                 <th rowSpan={2} className="text-left font-medium text-gray-700 py-1 px-2 border-b border-gray-200 w-8 align-top" aria-label="Actions" />
@@ -1483,6 +1559,11 @@ export default function SelectQuoteLineItemsPage({ onBack, quote1Locations = [],
                         </button>
                       </div>
                     )}
+                  </td>
+                  )}
+                  {showColumn('technicalAttributes') && (
+                  <td className="py-1 px-2 border-r border-gray-100">
+                    {getCellValue(row, 'technicalAttributes') || row.technicalAttributes || '—'}
                   </td>
                   )}
                   <td className="py-1 px-2 border-l border-gray-100 align-middle w-8 relative">

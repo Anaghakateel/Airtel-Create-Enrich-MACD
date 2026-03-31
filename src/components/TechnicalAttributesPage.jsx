@@ -4,7 +4,7 @@
  */
 import TechnicalEnrichmentPage from './TechnicalEnrichmentPage'
 
-export default function TechnicalAttributesPage({ onBackToEnrichQuote, onBackToQuote, onSaveWithConfiguredLocations, compareWithAsset, onCompareWithAssetChange, technicalAttributesOverrides, productFilterLocationIds }) {
+export default function TechnicalAttributesPage({ onBackToEnrichQuote, onBackToQuote, onSaveWithConfiguredLocations, compareWithAsset, onCompareWithAssetChange, technicalAttributesOverrides, productFilterLocationIds, autoFillValues = false }) {
   return (
     <div className="flex flex-col min-h-0 flex-1">
       {/* Breadcrumbs: Quote > Enrich Quote > Technical Attributes */}
@@ -35,6 +35,7 @@ export default function TechnicalAttributesPage({ onBackToEnrichQuote, onBackToQ
         onCompareWithAssetChange={onCompareWithAssetChange}
         technicalAttributesOverrides={technicalAttributesOverrides}
         productFilterLocationIds={productFilterLocationIds}
+        autoFillValues={autoFillValues}
       />
     </div>
   )

@@ -497,7 +497,7 @@ function SummaryTabContent({ locations = [], onTotalsChange, onEditRow, showFeas
               disabled={selectedIds.size === 0}
               onClick={() => selectedIds.size > 0 && onAssignConfigurations?.(Array.from(selectedIds))}
             >
-              Assign Configurations
+              Apply Configurations
             </button>
             {!embedMode && (
               <>

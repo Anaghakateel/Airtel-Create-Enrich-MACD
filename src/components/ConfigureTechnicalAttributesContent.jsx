@@ -697,10 +697,41 @@ function FieldDate({ defaultValue = '', disabled }) {
   )
 }
 
-export default function ConfigureTechnicalAttributesContent({ onDirtyChange, compareWithAsset, technicalAttributesOverrides, confidenceLevel = 'Below 30%' }) {
+function SectionHeaderWithCopyToggle({ title, isActive, onToggle }) {
+  return (
+    <div className="mb-4 flex items-start justify-between gap-4">
+      <h3 className="text-sm font-semibold text-gray-900">{title}</h3>
+      <div className="flex flex-col items-end">
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-semibold text-gray-800">Copy Attributes</span>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={isActive}
+            onClick={onToggle}
+            className={`relative inline-flex h-5 w-10 shrink-0 rounded-full border-2 border-transparent transition-colors focus:outline-none focus:ring-2 focus:ring-airtel-red/20 focus:ring-offset-1 ${isActive ? 'bg-airtel-red' : 'bg-gray-300'}`}
+          >
+            <span
+              className={`pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow ring-0 transition-transform ${isActive ? 'translate-x-5' : 'translate-x-0.5'}`}
+            />
+          </button>
+        </div>
+        <span className="text-[10px] text-gray-500 mt-0.5">{isActive ? 'Active' : 'Inactive'}</span>
+      </div>
+    </div>
+  )
+}
+
+export default function ConfigureTechnicalAttributesContent({ onDirtyChange, compareWithAsset, technicalAttributesOverrides, confidenceLevel = 'Below 30%', autoFillValues = false }) {
   const formRef = useRef(null)
   const [routingType, setRoutingType] = useState(technicalAttributesOverrides?.routingType ?? '')
   const [activeConfidenceLevel, setActiveConfidenceLevel] = useState(confidenceLevel)
+  const [copyAttributesToggles, setCopyAttributesToggles] = useState({
+    primaryLink: false,
+    connectivityIpBlock: false,
+    connectivityLanIp: false,
+    connectivityWanIp: false,
+  })
   useEffect(() => {
     if (technicalAttributesOverrides?.routingType) setRoutingType(technicalAttributesOverrides.routingType)
   }, [technicalAttributesOverrides])
@@ -708,14 +739,16 @@ export default function ConfigureTechnicalAttributesContent({ onDirtyChange, com
     setActiveConfidenceLevel(confidenceLevel)
   }, [confidenceLevel])
   useEffect(() => {
+    if (!autoFillValues) return
     const profile = CONFIDENCE_LEVEL_PROFILES[activeConfidenceLevel] || CONFIDENCE_LEVEL_PROFILES['All Confidence Levels']
     const routingByConfidence = profile?.selects?.['Routing Type'] || 'Static'
     if (!technicalAttributesOverrides?.routingType) {
       setRoutingType(routingByConfidence)
     }
-  }, [activeConfidenceLevel, technicalAttributesOverrides])
+  }, [activeConfidenceLevel, technicalAttributesOverrides, autoFillValues])
 
   useEffect(() => {
+    if (!autoFillValues) return
     const formEl = formRef.current
     if (!formEl) return
 
@@ -729,9 +762,6 @@ export default function ConfigureTechnicalAttributesContent({ onDirtyChange, com
       let fallbackIndex = 1
       formEl.querySelectorAll('input, select, textarea').forEach((field) => {
         if (field.disabled) return
-        const parentSection = field.closest('section')
-        const sectionTitle = normalizeFieldLabel(parentSection?.querySelector('h3')?.textContent || '')
-        if (sectionTitle === 'Account & Order Details') return
         const label = findFormFieldLabel(field, formEl)
         if (!label) return
 
@@ -761,7 +791,7 @@ export default function ConfigureTechnicalAttributesContent({ onDirtyChange, com
     }, 0)
 
     return () => clearTimeout(timer)
-  }, [activeConfidenceLevel])
+  }, [activeConfidenceLevel, autoFillValues])
 
   useEffect(() => {
     const formEl = formRef.current
@@ -801,6 +831,10 @@ export default function ConfigureTechnicalAttributesContent({ onDirtyChange, com
 
     return () => clearTimeout(timer)
   }, [routingType])
+  const toggleCopyAttributes = (key) => {
+    setCopyAttributesToggles((prev) => ({ ...prev, [key]: !prev[key] }))
+    onDirtyChange?.(true)
+  }
   const gridClass = 'grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-x-4 gap-y-3 text-xs'
   const isStaticRouting = routingType === 'Static'
 
@@ -909,7 +943,11 @@ export default function ConfigureTechnicalAttributesContent({ onDirtyChange, com
 
       {/* 3. Primary Link */}
       <section>
-        <h3 className="text-sm font-semibold text-gray-900 mb-4">Primary Link</h3>
+        <SectionHeaderWithCopyToggle
+          title="Primary Link"
+          isActive={copyAttributesToggles.primaryLink}
+          onToggle={() => toggleCopyAttributes('primaryLink')}
+        />
         <div className={gridClass}>
           <FormField label="Access Bandwidth">
             <FieldSelect options={OPTIONS.accessBandwidth} defaultValue="10 Mbps" disabled />
@@ -1211,7 +1249,11 @@ export default function ConfigureTechnicalAttributesContent({ onDirtyChange, com
 
       {/* 4. Connectivity IP Block */}
       <section>
-        <h3 className="text-sm font-semibold text-gray-900 mb-4">Connectivity IP Block</h3>
+        <SectionHeaderWithCopyToggle
+          title="Connectivity IP Block"
+          isActive={copyAttributesToggles.connectivityIpBlock}
+          onToggle={() => toggleCopyAttributes('connectivityIpBlock')}
+        />
         <div className={gridClass}>
           <FormField label="Loopback IPv4 with Subnet M..." showOldValues={compareWithAsset} oldValue="Previous value">
             <FieldInput placeholder="Loopback IPv4 with Subnet M..." />
@@ -1224,7 +1266,11 @@ export default function ConfigureTechnicalAttributesContent({ onDirtyChange, com
 
       {/* 5. Connectivity LAN IP */}
       <section>
-        <h3 className="text-sm font-semibold text-gray-900 mb-4">Connectivity LAN IP</h3>
+        <SectionHeaderWithCopyToggle
+          title="Connectivity LAN IP"
+          isActive={copyAttributesToggles.connectivityLanIp}
+          onToggle={() => toggleCopyAttributes('connectivityLanIp')}
+        />
         <div className={gridClass}>
           <FormField label="Add LAN IPv4" showOldValues={compareWithAsset} oldValue="Previous value">
             <FieldInput placeholder="Add LAN IPv4" />
@@ -1251,7 +1297,11 @@ export default function ConfigureTechnicalAttributesContent({ onDirtyChange, com
 
       {/* 6. Connectivity WAN IP */}
       <section>
-        <h3 className="text-sm font-semibold text-gray-900 mb-4">Connectivity WAN IP</h3>
+        <SectionHeaderWithCopyToggle
+          title="Connectivity WAN IP"
+          isActive={copyAttributesToggles.connectivityWanIp}
+          onToggle={() => toggleCopyAttributes('connectivityWanIp')}
+        />
         <div className={gridClass}>
           <FormField label="IP Type">
             <FieldSelect options={OPTIONS.ipType} defaultValue="IPv4" disabled />

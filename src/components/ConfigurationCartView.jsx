@@ -19,12 +19,12 @@ export default function ConfigurationCartView({ row, onBack, locations = [], onU
   const oneTimeTotal = row?.oneTimeTotal ?? 10000
   const monthlyTotal = row?.recurringTotal ?? 0
   const updateCartEnabled = hasUpdates
-  const addConfigurationsEnabled = subTab === 'Apply Configuration to related products' && assignedConfigRowIds.size > 0
+  const addConfigurationsEnabled = subTab === 'Apply Configurations to selected' && assignedConfigRowIds.size > 0
   const addProductsLabel = 'Add Configurations to products'
 
   return (
     <div className="flex flex-col min-h-0 h-full bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
-      {/* Sub-tabs: Configuration Cart | Apply Configuration to related products */}
+      {/* Sub-tabs: Configuration Cart | Apply Configurations to selected */}
       <div className="border-b border-gray-200 shrink-0">
         <div className="flex gap-0">
           <button
@@ -36,10 +36,10 @@ export default function ConfigurationCartView({ row, onBack, locations = [], onU
           </button>
           <button
             type="button"
-            onClick={() => setSubTab('Apply Configuration to related products')}
-            className={`px-4 py-3 text-xs font-semibold border-b-2 -mb-px transition-colors ${subTab === 'Apply Configuration to related products' ? 'text-airtel-red border-airtel-red' : 'text-gray-500 border-transparent hover:text-gray-700'}`}
+            onClick={() => setSubTab('Apply Configurations to selected')}
+            className={`px-4 py-3 text-xs font-semibold border-b-2 -mb-px transition-colors ${subTab === 'Apply Configurations to selected' ? 'text-airtel-red border-airtel-red' : 'text-gray-500 border-transparent hover:text-gray-700'}`}
           >
-            Apply Configuration to related products
+            Apply Configurations to selected
           </button>
         </div>
       </div>
@@ -97,7 +97,7 @@ export default function ConfigurationCartView({ row, onBack, locations = [], onU
             onClick={() => {
               if (updateCartEnabled) {
                 setHasUpdates(false)
-                setSubTab('Apply Configuration to related products')
+                setSubTab('Apply Configurations to selected')
               }
             }}
             className={updateCartEnabled ? 'px-4 py-2 rounded-md border border-gray-300 bg-white text-airtel-red text-xs font-medium hover:bg-grey-bg' : 'px-4 py-2 rounded-md border border-gray-300 bg-gray-100 text-gray-500 text-xs font-medium cursor-not-allowed'}
