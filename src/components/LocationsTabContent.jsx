@@ -22,6 +22,11 @@ function getStableNumericSeed(id, fallback = 0) {
   return fallback
 }
 
+function getRootProductName(loc, index) {
+  void index
+  return loc.product || 'Internet'
+}
+
 const PAGE_SIZE = 5
 
 const UPDATED_BADGE = (
@@ -166,12 +171,17 @@ function LocationsTabContent({ locations: locationsProp, configuredLocationIds =
   }, [isTechnicalEnrichmentView])
   const { getColStyle, ResizeHandle } = useResizableColumns(locationsResizableCols)
 
+  const technicalViewLocations = useMemo(() => {
+    if (!isTechnicalEnrichmentView) return locations
+    return locations.filter((loc, idx) => getRootProductName(loc, idx) === 'Internet')
+  }, [locations, isTechnicalEnrichmentView])
+
   const filteredByViewBy =
     viewBy === 'Show Configured locations'
-      ? locations.filter((loc) => configuredSet.has(loc.id))
+      ? technicalViewLocations.filter((loc) => configuredSet.has(loc.id))
       : viewBy === 'Show Unconfigured locations'
-        ? locations.filter((loc) => !configuredSet.has(loc.id))
-        : locations
+        ? technicalViewLocations.filter((loc) => !configuredSet.has(loc.id))
+        : technicalViewLocations
   const filteredLocations =
     viewingSelectedOnly && selectedCount > 0
       ? filteredByViewBy.filter((loc) => selectedIds.has(loc.id))
@@ -202,7 +212,6 @@ function LocationsTabContent({ locations: locationsProp, configuredLocationIds =
   }
 
   const getTechnicalRowValues = (loc, absoluteIndex) => {
-    const productCycle = ['Internet', 'MPLS', 'SD WAN']
     const mediaCycle = ['50 Mbps', '100 Mbps', '200 Mbps']
     const serviceTypeCycle = ['Unmanaged', 'Partially Managed', 'Managed']
     const seed = getStableNumericSeed(loc.id, absoluteIndex + 1)
@@ -211,7 +220,7 @@ function LocationsTabContent({ locations: locationsProp, configuredLocationIds =
     const arcTotal = Number(loc.arcTotal ?? recurring * 12)
     return {
       member: loc.streetAddress || [loc.city, loc.state, loc.country || 'India'].filter(Boolean).join(', '),
-      product: loc.product || productCycle[absoluteIndex % productCycle.length],
+      product: getRootProductName(loc, absoluteIndex),
       media: loc.maxBandwidth || loc.bandwidth || mediaCycle[absoluteIndex % mediaCycle.length],
       serviceType: loc.serviceType || serviceTypeCycle[absoluteIndex % serviceTypeCycle.length],
       lsi: loc.lsi || `80002301259${String(100 + (seed % 900))}`,
