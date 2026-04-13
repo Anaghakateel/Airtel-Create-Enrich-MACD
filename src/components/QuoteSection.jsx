@@ -14,6 +14,9 @@ function QuoteSection({
   onCheckFeasibility,
   onValidateQuote,
   status = 'Draft', // "Draft" | "Feasibility" | "Validated"
+  quoteTitle = 'HDFC bank connectivity across India',
+  showExtractedInformationTab = true,
+  feasibilityRequestId = '',
 }) {
   const oneTimeDisplay = oneTimeTotal > 0 ? `₹${oneTimeTotal.toLocaleString()}` : '₹0.00'
   const arcDisplay = arcTotal > 0 ? `₹${arcTotal.toLocaleString()}` : '₹0.00'
@@ -43,7 +46,7 @@ function QuoteSection({
             <div className="min-w-0">
               <h1 className="text-base text-gray-900">
                 <span className="block font-normal">Enterprise Quote</span>
-                <span className="block font-bold">HDFC bank connectivity across India</span>
+                <span className="block font-bold">{quoteTitle}</span>
               </h1>
             </div>
           </div>
@@ -156,14 +159,12 @@ function QuoteSection({
             <p className="text-xs text-gray-500 tracking-wide">Status</p>
             <p className="text-sm font-bold text-gray-900 mt-0.5">{status}</p>
           </div>
-          <div>
-            <p className="text-xs text-gray-500 tracking-wide">Item Codes Valid</p>
-            <p className="text-sm font-bold text-gray-900 mt-0.5">N/A</p>
-          </div>
-          <div>
-            <p className="text-xs text-gray-500 tracking-wide">DLT Ref ID Valid</p>
-            <p className="text-sm font-bold text-gray-900 mt-0.5">N/A</p>
-          </div>
+          {String(feasibilityRequestId || '').trim() && (
+            <div>
+              <p className="text-xs text-gray-500 tracking-wide">Feasibility Request ID</p>
+              <p className="text-sm font-bold text-gray-900 mt-0.5">{feasibilityRequestId}</p>
+            </div>
+          )}
         </div>
       </div>
 
@@ -174,7 +175,7 @@ function QuoteSection({
             {[
               { id: 'Summary', label: 'Summary', count: summaryCount },
               { id: 'Locations', label: 'Location', count: locationsCount },
-              { id: 'Extracted Information', label: 'Extracted Information', count: extractedInfoCount },
+              ...(showExtractedInformationTab ? [{ id: 'Extracted Information', label: 'Extracted Information', count: extractedInfoCount }] : []),
             ].map((tab) => (
               <button
                 key={tab.id}

@@ -30,6 +30,31 @@ export function useResizableColumns(columns) {
   })
   const [resizing, setResizing] = useState(null) // { columnId, startX, startWidth }
 
+  // Keep widths in sync when a table adds/removes columns at runtime.
+  // This ensures newly introduced columns get compact default widths immediately.
+  useEffect(() => {
+    setColumnWidths((prev) => {
+      const next = { ...prev }
+      let changed = false
+
+      columns.forEach((c) => {
+        if (next[c.id] == null) {
+          next[c.id] = c.defaultWidth ?? getDefaultWidthFromLabel(c.label)
+          changed = true
+        }
+      })
+
+      Object.keys(next).forEach((id) => {
+        if (!columns.some((c) => c.id === id)) {
+          delete next[id]
+          changed = true
+        }
+      })
+
+      return changed ? next : prev
+    })
+  }, [columns])
+
   const startResize = useCallback((columnId, clientX) => {
     const col = columns.find((c) => c.id === columnId)
     const fallback = col?.defaultWidth ?? getDefaultWidthFromLabel(col?.label)

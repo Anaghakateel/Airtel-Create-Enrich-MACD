@@ -97,6 +97,7 @@ const CONFIDENCE_LEVEL_OPTIONS = [
   { value: '70-85', label: '70-85%', min: 70, max: 85 },
   { value: 'above85', label: 'Above 85%', min: 86, max: 100 },
 ]
+const ADDRESS_STATUS_OPTIONS = ['Valid', 'Invalid', 'Partial']
 
 const OTHER_FIELDS = {
   postalCodes: ['110021', '600070', '110045', '110078', '110023', '600090', '110015', '600056', '110034', '600067', '400001', '500032', '560001', '700001', '600001'],
@@ -421,6 +422,7 @@ function DataTableSection({
   hideMatchSummaryNotification = false,
   onMatchedProductsEditComplete,
   isMacdQuote = false,
+  isCreateQuote2Flow = false,
 }) {
   const continuedRecordIds = continuedRecordIdsProp ?? new Set()
   const PAGE_SIZE = 10
@@ -445,10 +447,12 @@ function DataTableSection({
   const [confidenceLevelFilter, setConfidenceLevelFilter] = useState(null) // null = All; or value from CONFIDENCE_LEVEL_OPTIONS
   const [matchedProductFilter, setMatchedProductFilter] = useState(null) // null = All Matched Products
   const [mediaFilter, setMediaFilter] = useState(null) // null = All Media; or 'Copper' | 'Fiber'
+  const [addressStatusFilter, setAddressStatusFilter] = useState(null) // null = All Address Statuses
   const [requestedProductDropdownOpen, setRequestedProductDropdownOpen] = useState(false)
   const [confidenceLevelDropdownOpen, setConfidenceLevelDropdownOpen] = useState(false)
   const [matchedProductDropdownOpen, setMatchedProductDropdownOpen] = useState(false)
   const [mediaDropdownOpen, setMediaDropdownOpen] = useState(false)
+  const [addressStatusDropdownOpen, setAddressStatusDropdownOpen] = useState(false)
   const [searchInput, setSearchInput] = useState('')
   const [searchFilter, setSearchFilter] = useState(null) // applied when user clicks Search button
   const [showSearchSuggestions, setShowSearchSuggestions] = useState(false)
@@ -506,6 +510,12 @@ function DataTableSection({
     const base = [
       { id: 'streetAddress', label: 'Street Address' },
       { id: 'postalCode', label: 'Postal Code' },
+      ...(isCreateQuote2Flow
+        ? [
+            { id: 'premises', label: 'Premises', defaultWidth: 70 },
+            { id: 'addressStatus', label: 'Address Status', defaultWidth: 96 },
+          ]
+        : []),
       { id: 'requestedProducts', label: 'Requested Products' },
       { id: 'matchedProducts', label: 'Matched Products' },
       { id: 'media', label: 'Media' },
@@ -530,7 +540,7 @@ function DataTableSection({
       ]
     }
     return base
-  }, [isMacdQuote])
+  }, [isMacdQuote, isCreateQuote2Flow])
   const { getColStyle, ResizeHandle } = useResizableColumns(dataTableResizableCols)
   const macdNewAttributesCache = useRef({}) // Persist newAttributes per row so they don't fluctuate on re-render
   const macdNewTechnologyCache = useRef({}) // Persist newTechnology per row for MACD New Media column
@@ -542,6 +552,10 @@ function DataTableSection({
   const effectiveMatchResults = showMatchedResults ? matchResults : {}
   const dataRowsWithEdits = dataRows.map((row) => {
     const merged = { ...row, ...cellEdits[row.id], ...effectiveMatchResults[row.id] }
+    if (isCreateQuote2Flow) {
+      merged.premises = merged.premises ?? ''
+      merged.addressStatus = merged.addressStatus ?? ''
+    }
     if (isMacdQuote) {
       if (!merged.matchedProducts) {
         merged.matchedProducts = MATCHED_PRODUCTS_OPTIONS[getCategoryForRequestedProduct(merged.requestedProducts)]?.[0] ?? getCategoryForRequestedProduct(merged.requestedProducts)
@@ -577,6 +591,7 @@ function DataTableSection({
     }
     if (matchedProductFilter != null && row.matchedProducts !== matchedProductFilter) return false
     if (mediaFilter != null && row.technology !== mediaFilter) return false
+    if (addressStatusFilter != null && row.addressStatus !== addressStatusFilter) return false
     return true
   })
 
@@ -714,6 +729,9 @@ function DataTableSection({
     if (mediaFilter != null) {
       parts.push(`Shows ${rows.length} ${mediaFilter}`)
     }
+    if (addressStatusFilter != null) {
+      parts.push(`Shows ${rows.length} ${addressStatusFilter} address status`)
+    }
     if (searchFilter != null && String(searchFilter).trim() !== '') {
       parts.push(`Shows ${rows.length} matching search`)
     }
@@ -721,7 +739,7 @@ function DataTableSection({
   })()
 
   // When grouped by Media or Requested Products (and not sorting by Confidence), insert section header rows
-  const TABLE_COLUMN_COUNT = isMacdQuote ? 14 : 10
+  const TABLE_COLUMN_COUNT = isMacdQuote ? 14 : (isCreateQuote2Flow ? 12 : 10)
   const effectiveColumnCount = TABLE_COLUMN_COUNT
   const tbodyItems = (() => {
     if (viewByValue === 'All' || confidenceSortDirection != null) return visibleRows.map((row) => ({ type: 'row', row }))
@@ -851,6 +869,7 @@ function DataTableSection({
         setConfidenceLevelDropdownOpen(false)
         setMatchedProductDropdownOpen(false)
         setMediaDropdownOpen(false)
+        setAddressStatusDropdownOpen(false)
       }
     }
     document.addEventListener('click', handleClickOutside)
@@ -906,6 +925,41 @@ function DataTableSection({
         pendingMatchResultsRef.current = next
       }
     }, 2000)
+  }
+
+  const buildPremiseId = (index) => `PRM-${String(120000 + index).slice(-6)}`
+
+  const handleMatchLocationsForPremises = () => {
+    setCellEdits((prev) => {
+      const next = { ...prev }
+      dataRows.forEach((row, idx) => {
+        next[row.id] = {
+          ...(next[row.id] || {}),
+          premises: idx % 5 === 0 ? '' : buildPremiseId(idx + 1),
+        }
+      })
+      return next
+    })
+  }
+
+  const handleValidateAddressForQuote2 = () => {
+    setCellEdits((prev) => {
+      const next = { ...prev }
+      let missingCount = 0
+      dataRows.forEach((row) => {
+        const premiseValue = String((prev[row.id]?.premises ?? row.premises ?? '')).trim()
+        let status = 'Valid'
+        if (!premiseValue) {
+          status = missingCount % 2 === 0 ? 'Partial' : 'Invalid'
+          missingCount += 1
+        }
+        next[row.id] = {
+          ...(next[row.id] || {}),
+          addressStatus: status,
+        }
+      })
+      return next
+    })
   }
 
   useEffect(() => {
@@ -1066,6 +1120,7 @@ function DataTableSection({
       setConfidenceLevelFilter,
       setMatchedProductFilter,
       setMediaFilter,
+      setAddressStatusFilter,
       setViewByValue,
       setSearchFilter,
       setViewSelectedOnly,
@@ -1083,6 +1138,7 @@ function DataTableSection({
         setConfidenceLevelFilter(null)
         setMatchedProductFilter(null)
         setMediaFilter(null)
+        setAddressStatusFilter(null)
       },
       showUpdatedBadgeForRows: (rowIds) => {
         if (!rowIds || !rowIds.length) return
@@ -1128,9 +1184,10 @@ function DataTableSection({
         }
       },
       applyUpdateFromIntent,
+      validateAddressesForQuote2: handleValidateAddressForQuote2,
     }
     return () => { quoteActionsRef.current = {} }
-  }, [isMacdQuote])
+  }, [isMacdQuote, isCreateQuote2Flow])
 
   const postalCodePopover =
     postalCodePopoverPosition &&
@@ -1613,7 +1670,7 @@ function DataTableSection({
                       <div className="relative">
                         <button
                           type="button"
-                          onClick={() => { setConfidenceLevelDropdownOpen(false); setMatchedProductDropdownOpen(false); setMediaDropdownOpen(false); setRequestedProductDropdownOpen((o) => !o) }}
+                          onClick={() => { setConfidenceLevelDropdownOpen(false); setMatchedProductDropdownOpen(false); setMediaDropdownOpen(false); setAddressStatusDropdownOpen(false); setRequestedProductDropdownOpen((o) => !o) }}
                           className="w-full flex items-center justify-between px-2.5 py-1.5 border border-gray-300 rounded-md bg-white text-left text-xs text-gray-600"
                         >
                           <span>{requestedProductFilter == null ? 'All Products' : requestedProductFilter}</span>
@@ -1636,7 +1693,7 @@ function DataTableSection({
                       <div className="relative">
                         <button
                           type="button"
-                          onClick={() => { setRequestedProductDropdownOpen(false); setMatchedProductDropdownOpen(false); setMediaDropdownOpen(false); setConfidenceLevelDropdownOpen((o) => !o) }}
+                          onClick={() => { setRequestedProductDropdownOpen(false); setMatchedProductDropdownOpen(false); setMediaDropdownOpen(false); setAddressStatusDropdownOpen(false); setConfidenceLevelDropdownOpen((o) => !o) }}
                           className="w-full flex items-center justify-between px-2.5 py-1.5 border border-gray-300 rounded-md bg-white text-left text-xs text-gray-600"
                         >
                           <span>
@@ -1663,7 +1720,7 @@ function DataTableSection({
                       <div className="relative">
                         <button
                           type="button"
-                          onClick={() => { setRequestedProductDropdownOpen(false); setConfidenceLevelDropdownOpen(false); setMediaDropdownOpen(false); setMatchedProductDropdownOpen((o) => !o) }}
+                          onClick={() => { setRequestedProductDropdownOpen(false); setConfidenceLevelDropdownOpen(false); setMediaDropdownOpen(false); setAddressStatusDropdownOpen(false); setMatchedProductDropdownOpen((o) => !o) }}
                           className="w-full flex items-center justify-between px-2.5 py-1.5 border border-gray-300 rounded-md bg-white text-left text-xs text-gray-600"
                         >
                           <span>{matchedProductFilter == null ? 'All Matched Products' : matchedProductFilter}</span>
@@ -1686,7 +1743,7 @@ function DataTableSection({
                       <div className="relative">
                         <button
                           type="button"
-                          onClick={() => { setRequestedProductDropdownOpen(false); setConfidenceLevelDropdownOpen(false); setMatchedProductDropdownOpen(false); setMediaDropdownOpen((o) => !o) }}
+                          onClick={() => { setRequestedProductDropdownOpen(false); setConfidenceLevelDropdownOpen(false); setMatchedProductDropdownOpen(false); setAddressStatusDropdownOpen(false); setMediaDropdownOpen((o) => !o) }}
                           className="w-full flex items-center justify-between px-2.5 py-1.5 border border-gray-300 rounded-md bg-white text-left text-xs text-gray-600"
                         >
                           <span>{mediaFilter == null ? 'All Media' : mediaFilter}</span>
@@ -1704,6 +1761,31 @@ function DataTableSection({
                         )}
                       </div>
                     </div>
+                    {isCreateQuote2Flow && (
+                      <div>
+                        <label className="block text-xs font-semibold text-gray-700 mb-1">Address Status</label>
+                        <div className="relative">
+                          <button
+                            type="button"
+                            onClick={() => { setRequestedProductDropdownOpen(false); setConfidenceLevelDropdownOpen(false); setMatchedProductDropdownOpen(false); setMediaDropdownOpen(false); setAddressStatusDropdownOpen((o) => !o) }}
+                            className="w-full flex items-center justify-between px-2.5 py-1.5 border border-gray-300 rounded-md bg-white text-left text-xs text-gray-600"
+                          >
+                            <span>{addressStatusFilter == null ? 'All Address Statuses' : addressStatusFilter}</span>
+                            <svg className="w-3.5 h-3.5 text-gray-500 shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+                            </svg>
+                          </button>
+                          {addressStatusDropdownOpen && (
+                            <div className="absolute left-0 right-0 top-full mt-0.5 py-0.5 bg-white border border-gray-200 rounded-md shadow-lg z-10">
+                              <button type="button" onClick={() => { setAddressStatusFilter(null); setAddressStatusDropdownOpen(false) }} className="w-full text-left px-2.5 py-1.5 text-xs text-gray-700 hover:bg-grey-bg">All Address Statuses</button>
+                              {ADDRESS_STATUS_OPTIONS.map((status) => (
+                                <button key={status} type="button" onClick={() => { setAddressStatusFilter(status); setAddressStatusDropdownOpen(false) }} className="w-full text-left px-2.5 py-1.5 text-xs text-gray-700 hover:bg-grey-bg">{status}</button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
@@ -1770,6 +1852,15 @@ function DataTableSection({
             >
               Match All Products
             </button>
+            {isCreateQuote2Flow && (
+              <button
+                type="button"
+                onClick={handleMatchLocationsForPremises}
+                className="px-4 py-1.5 rounded-md border border-gray-300 bg-white text-airtel-red text-xs font-medium hover:bg-grey-bg"
+              >
+                Match Locations for Premises
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -1809,6 +1900,7 @@ function DataTableSection({
               setConfidenceLevelFilter(null)
               setMatchedProductFilter(null)
               setMediaFilter(null)
+              setAddressStatusFilter(null)
               setSearchFilter(null)
               setSearchInput('')
               setCurrentPage(1)
@@ -1843,6 +1935,8 @@ function DataTableSection({
               <col className="w-10" />
               <col style={getColStyle('streetAddress')} />
               <col style={getColStyle('postalCode')} />
+              {isCreateQuote2Flow && <col style={getColStyle('premises')} />}
+              {isCreateQuote2Flow && <col style={getColStyle('addressStatus')} />}
               {isMacdQuote && <col style={getColStyle('assetName')} />}
               {isMacdQuote && <col style={getColStyle('lsi')} />}
               <col style={getColStyle('requestedProducts')} />
@@ -1875,6 +1969,8 @@ function DataTableSection({
                 </th>
                 <th className="px-2 py-1 text-left font-semibold text-gray-700 truncate text-xs group relative" title="Street Address" style={getColStyle('streetAddress')}><span className="block truncate">Street Address</span><ResizeHandle columnId="streetAddress" /></th>
                 <th className="px-2 py-1 text-left font-semibold text-gray-700 truncate text-xs group relative" title="Postal Code" style={getColStyle('postalCode')}><span className="block truncate">Postal Code</span><ResizeHandle columnId="postalCode" /></th>
+                {isCreateQuote2Flow && <th className="px-2 py-1 text-left font-semibold text-gray-700 truncate text-xs group relative" title="Premises" style={getColStyle('premises')}><span className="block truncate">Premises</span><ResizeHandle columnId="premises" /></th>}
+                {isCreateQuote2Flow && <th className="px-2 py-1 text-left font-semibold text-gray-700 truncate text-xs group relative" title="Address Status" style={getColStyle('addressStatus')}><span className="block truncate">Address Status</span><ResizeHandle columnId="addressStatus" /></th>}
                 {isMacdQuote && <th className="px-2 py-1 text-left font-semibold text-gray-700 truncate text-xs group relative" title="Asset Name" style={getColStyle('assetName')}><span className="block truncate">Asset Name</span><ResizeHandle columnId="assetName" /></th>}
                 {isMacdQuote && <th className="px-2 py-1 text-left font-semibold text-gray-700 truncate text-xs group relative" title="LSI" style={getColStyle('lsi')}><span className="block truncate">LSI</span><ResizeHandle columnId="lsi" /></th>}
                 <th className="px-2 py-1 text-left font-semibold text-gray-700 truncate text-xs group relative" title="Requested Products" style={getColStyle('requestedProducts')}>
@@ -2030,6 +2126,16 @@ function DataTableSection({
                       </div>
                     )}
                   </td>
+                  {isCreateQuote2Flow && (
+                    <td className="px-2 py-1 text-gray-800 align-middle min-w-0">
+                      <div className="truncate" title={item.row.premises || ''}>{item.row.premises || '---'}</div>
+                    </td>
+                  )}
+                  {isCreateQuote2Flow && (
+                    <td className="px-2 py-1 text-gray-800 align-middle min-w-0">
+                      <div className="truncate" title={item.row.addressStatus || ''}>{item.row.addressStatus || '---'}</div>
+                    </td>
+                  )}
                   {isMacdQuote && (
                     <td className="px-2 py-1 text-gray-800 align-middle min-w-0">
                       <div className="truncate" title={item.row.assetName}>{item.row.assetName}</div>

@@ -45,7 +45,7 @@ const DEFAULT_QUOTE1_PANEL_SNAPSHOT = {
   hasNotification: false,
 }
 
-function Header({ activeNavTab = 'Quote', onNavClick, selectedQuote = 'Quote 1', onQuoteSelect, onNavigateToQuoteExtractedInfo, onNavigateToUpdatedQuote, updatedQuoteNotification = false, onNavigateToUpdatedQuote2, updatedQuoteProposal2Notification = false, onNavigateToUpdatedQuote3, updatedQuoteProposal3Notification = false, onNavigateToUpdatedQuote4, updatedQuoteProposal4Notification = false, attributesUpdatedNotification = false, onAttributesUpdated, onNavigateToAttributesUpdatedView, updatedMatchedProductsNotification = false, onNavigateToUpdatedMatchedProducts, updatedRequestedValuesNotification = false, onNavigateToUpdatedRequestedValues, onUpdatedRequestedValuesCreated, onMarkAllNotificationsRead, feasibilityProposalNotification = false, onNavigateToFeasibilityProposal, validateQuoteNotification = false, onNavigateToValidatedQuote, updatedConfigurationsToQuoteNotification = false, onNavigateToUpdatedConfigurationsToQuote, onMarkAllNotificationsReadOnNavigateToQuote, restoreQuoteAgentforceKey, enrichQuoteFlowActive = false, quoteActionsRef, agentforcePanelOpen: agentforcePanelOpenProp, onAgentforcePanelChange, skipOpenPanelOnHomeRef, onNavigateToQuote2, onQuote2POUpdated, quote2ProgressStage = 'Draft', onMatchProductsResponseShown, onMatchProductsAnalysisStart, onMatchProductsAnalysisEnd, onVerifyDetailsResponseShown, onVerifyDetailsAnalysisStart, onVerifyDetailsAnalysisEnd, onAddProductsResponseShown, onAddProductsAnalysisStart, onAddProductsAnalysisEnd, onUpdateChangeAnalysisStart, onUpdateChangeAnalysisEnd, updatedUpgradeQuoteNotification = false, onNavigateToUpgradeQuote, onUpgradeQuoteCreated, updatedEnrichQuoteUpdateNotification = false, enrichQuoteUpdateIntent, onNavigateToEnrichQuoteUpdate, onEnrichQuoteUpdateCreated, onPOChangeUpdateAnalysisStart, technicalAttributesPageActive = false, onTechnicalAttributesToggleCompareWithAsset, updatedTechnicalAttributesUpdateNotification = false, technicalAttributesUpdateIntent, onNavigateToTechnicalAttributesUpdate, onTechnicalAttributesUpdateCreated, updatedMacdUpgradeUpdateNotification = false, onNavigateToMacdUpgradeUpdate, onMacdUpgradeUpdateCreated, onMacdUpgradeUpdateAnalysisStart, macdQuoteActive = false }) {
+function Header({ activeNavTab = 'Quote', onNavClick, selectedQuote = 'Quote 1', onQuoteSelect, onNavigateToQuoteExtractedInfo, onNavigateToUpdatedQuote, updatedQuoteNotification = false, onNavigateToUpdatedQuote2, updatedQuoteProposal2Notification = false, onNavigateToUpdatedQuote3, updatedQuoteProposal3Notification = false, onNavigateToUpdatedQuote4, updatedQuoteProposal4Notification = false, attributesUpdatedNotification = false, onAttributesUpdated, onNavigateToAttributesUpdatedView, updatedMatchedProductsNotification = false, onNavigateToUpdatedMatchedProducts, updatedRequestedValuesNotification = false, onNavigateToUpdatedRequestedValues, onUpdatedRequestedValuesCreated, onMarkAllNotificationsRead, feasibilityProposalNotification = false, onNavigateToFeasibilityProposal, feasibilityExtractionNotification = false, onNavigateToFeasibilityExtraction, onFeasibilityExtractionStatusShown, onFeasibilityCheckStatusShown, onNavigateToFeasibilityCheck, onFeasibilityValidateAddressStatusShown, onNavigateToFeasibilityValidateAddress, onFeasibilityMatchedProductsStatusShown, onNavigateToFeasibilityMatchedProducts, onFeasibilityLocationMatchAnalysisStart, onFeasibilityLocationMatchStatusShown, onNavigateToFeasibilityLocationMatch, newQuoteLocationsExtractionNotification = false, newQuoteLocationsExtractionLinkText = 'Extracted Information for HDFC Bank account', onNavigateToNewQuoteLocationsExtraction, onNewQuoteLocationsExtractionStatusShown, sbiQuoteNotification = false, onNavigateToSbiQuote, onSbiQuoteStatusShown, hdfcQuoteNotification = false, onNavigateToHdfcQuote, validateQuoteNotification = false, onNavigateToValidatedQuote, updatedConfigurationsToQuoteNotification = false, onNavigateToUpdatedConfigurationsToQuote, onMarkAllNotificationsReadOnNavigateToQuote, restoreQuoteAgentforceKey, enrichQuoteFlowActive = false, quoteActionsRef, agentforcePanelOpen: agentforcePanelOpenProp, onAgentforcePanelChange, skipOpenPanelOnHomeRef, onNavigateToQuote2, onQuote2POUpdated, quote2ProgressStage = 'Draft', onMatchProductsResponseShown, onMatchProductsAnalysisStart, onMatchProductsAnalysisEnd, onVerifyDetailsResponseShown, onVerifyDetailsAnalysisStart, onVerifyDetailsAnalysisEnd, onAddProductsResponseShown, onAddProductsAnalysisStart, onAddProductsAnalysisEnd, onUpdateChangeAnalysisStart, onUpdateChangeAnalysisEnd, updatedUpgradeQuoteNotification = false, onNavigateToUpgradeQuote, onUpgradeQuoteCreated, updatedEnrichQuoteUpdateNotification = false, enrichQuoteUpdateIntent, onNavigateToEnrichQuoteUpdate, onEnrichQuoteUpdateCreated, onPOChangeUpdateAnalysisStart, technicalAttributesPageActive = false, onTechnicalAttributesToggleCompareWithAsset, updatedTechnicalAttributesUpdateNotification = false, technicalAttributesUpdateIntent, onNavigateToTechnicalAttributesUpdate, onTechnicalAttributesUpdateCreated, updatedMacdUpgradeUpdateNotification = false, onNavigateToMacdUpgradeUpdate, onMacdUpgradeUpdateCreated, onMacdUpgradeUpdateAnalysisStart, macdQuoteActive = false }) {
   const effectiveRestoreKey =
     restoreQuoteAgentforceKey && activeNavTab === 'Quote' && selectedQuote
       ? `${restoreQuoteAgentforceKey}_${String(selectedQuote).replace(/\s/g, '')}`
@@ -55,13 +55,21 @@ function Header({ activeNavTab = 'Quote', onNavClick, selectedQuote = 'Quote 1',
   const agentforcePanelOpen = onAgentforcePanelChange != null ? agentforcePanelOpenProp : agentforcePanelOpenLocal
   const setAgentforcePanelOpen = onAgentforcePanelChange ?? setAgentforcePanelOpenLocal
   const [bellNotification, setBellNotification] = useState(false)
+  const [feasibilityCheckNotification, setFeasibilityCheckNotification] = useState(false)
+  const [feasibilityValidateAddressNotification, setFeasibilityValidateAddressNotification] = useState(false)
+  const [feasibilityMatchedProductsNotification, setFeasibilityMatchedProductsNotification] = useState(false)
+  const [feasibilityLocationMatchNotification, setFeasibilityLocationMatchNotification] = useState(false)
   const [notificationPopoverOpen, setNotificationPopoverOpen] = useState(false)
   const [quoteDropdownOpen, setQuoteDropdownOpen] = useState(false)
+  const [feasibilityDropdownOpen, setFeasibilityDropdownOpen] = useState(false)
   const panelStateRef = useRef(null)
   const notificationPopoverRef = useRef(null)
   const quoteDropdownRef = useRef(null)
+  const feasibilityDropdownRef = useRef(null)
   const quoteButtonRef = useRef(null)
+  const feasibilityButtonRef = useRef(null)
   const [quoteDropdownPosition, setQuoteDropdownPosition] = useState({ top: 0, left: 0 })
+  const [feasibilityDropdownPosition, setFeasibilityDropdownPosition] = useState({ top: 0, left: 0 })
 
   // Single handler for "Updated Quote Proposal with Matched Products" – same action for both bell popup and agentic chat link (navigate, clear notification). Panel stays open unless user closes it.
   const handleNavigateToMatchedProducts = useCallback(() => {
@@ -101,15 +109,36 @@ function Header({ activeNavTab = 'Quote', onNavClick, selectedQuote = 'Quote 1',
   }, [notificationPopoverOpen])
 
   useEffect(() => {
-    if (!quoteDropdownOpen) return
+    if (!sbiQuoteNotification) return
+    setNotificationPopoverOpen(true)
+    setBellNotification(true)
+  }, [sbiQuoteNotification])
+
+  useEffect(() => {
+    if (!hdfcQuoteNotification) return
+    setNotificationPopoverOpen(true)
+    setBellNotification(true)
+  }, [hdfcQuoteNotification])
+
+  useEffect(() => {
+    if (!newQuoteLocationsExtractionNotification) return
+    setNotificationPopoverOpen(true)
+    setBellNotification(true)
+  }, [newQuoteLocationsExtractionNotification])
+
+  useEffect(() => {
+    if (!quoteDropdownOpen && !feasibilityDropdownOpen) return
     const handleClickOutside = (e) => {
       const inButton = quoteButtonRef.current && quoteButtonRef.current.contains(e.target)
+      const inFeasibilityButton = feasibilityButtonRef.current && feasibilityButtonRef.current.contains(e.target)
       const inDropdown = e.target.closest?.('[data-quote-dropdown]')
+      const inFeasibilityDropdown = e.target.closest?.('[data-feasibility-dropdown]')
       if (!inButton && !inDropdown) setQuoteDropdownOpen(false)
+      if (!inFeasibilityButton && !inFeasibilityDropdown) setFeasibilityDropdownOpen(false)
     }
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [quoteDropdownOpen])
+  }, [quoteDropdownOpen, feasibilityDropdownOpen])
 
   // When user goes to Quote (e.g. via "here" link or bell notification), show the conversation that happened so far; prefer persisted conversation snapshot so chat from Home is reflected on Quote page
   const conversationSnapshot = getStoredConversationSnapshot()
@@ -131,7 +160,7 @@ function Header({ activeNavTab = 'Quote', onNavClick, selectedQuote = 'Quote 1',
             ? conversationSnapshot
             : stored?.snapshot && typeof stored.snapshot.isConversationView === 'boolean' && Array.isArray(stored.snapshot.messages)
               ? stored.snapshot
-              : selectedQuote === 'Quote 1' || selectedQuote === 'MACD Quote' || (selectedQuote === 'Quote 2' && quote2ProgressStage === 'Draft')
+              : selectedQuote === 'Quote 1' || selectedQuote === 'Quote 1 (2)' || selectedQuote === 'MACD Quote' || (selectedQuote === 'Quote 2' && quote2ProgressStage === 'Draft')
                 ? DEFAULT_QUOTE1_PANEL_SNAPSHOT
                 : null)
         : enrichQuoteFlowActive && enrichQuoteStored?.messages?.length
@@ -179,6 +208,7 @@ function Header({ activeNavTab = 'Quote', onNavClick, selectedQuote = 'Quote 1',
   const navItems = [
     { label: 'Home', hasChevron: false },
     { label: 'Quote', hasChevron: true },
+    { label: 'Feasibility Request', hasChevron: true },
     { label: 'Contacts', hasChevron: true },
     { label: 'Service', hasChevron: true },
     { label: 'Sales', hasChevron: true },
@@ -265,7 +295,7 @@ function Header({ activeNavTab = 'Quote', onNavClick, selectedQuote = 'Quote 1',
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
               </svg>
-              {(bellNotification || updatedQuoteNotification || updatedQuoteProposal2Notification || updatedQuoteProposal3Notification || updatedQuoteProposal4Notification || attributesUpdatedNotification || updatedMatchedProductsNotification || updatedRequestedValuesNotification || feasibilityProposalNotification || validateQuoteNotification || updatedConfigurationsToQuoteNotification || updatedUpgradeQuoteNotification || updatedEnrichQuoteUpdateNotification || updatedTechnicalAttributesUpdateNotification || updatedMacdUpgradeUpdateNotification) && (
+              {(bellNotification || feasibilityCheckNotification || feasibilityValidateAddressNotification || feasibilityMatchedProductsNotification || feasibilityLocationMatchNotification || updatedQuoteNotification || updatedQuoteProposal2Notification || updatedQuoteProposal3Notification || updatedQuoteProposal4Notification || attributesUpdatedNotification || updatedMatchedProductsNotification || updatedRequestedValuesNotification || feasibilityProposalNotification || feasibilityExtractionNotification || newQuoteLocationsExtractionNotification || sbiQuoteNotification || hdfcQuoteNotification || validateQuoteNotification || updatedConfigurationsToQuoteNotification || updatedUpgradeQuoteNotification || updatedEnrichQuoteUpdateNotification || updatedTechnicalAttributesUpdateNotification || updatedMacdUpgradeUpdateNotification) && (
                 <span className="absolute -top-0.5 right-0 min-w-[18px] h-[18px] px-1 rounded-full bg-airtel-red text-white text-[10px] font-bold flex items-center justify-center ring-2 ring-white">1</span>
               )}
             </button>
@@ -278,7 +308,7 @@ function Header({ activeNavTab = 'Quote', onNavClick, selectedQuote = 'Quote 1',
                     <div className="flex items-center gap-2">
                         <button
                         type="button"
-                        onClick={() => { setBellNotification(false); onMarkAllNotificationsRead?.(); setNotificationPopoverOpen(false) }}
+                        onClick={() => { setBellNotification(false); setFeasibilityCheckNotification(false); setFeasibilityValidateAddressNotification(false); setFeasibilityMatchedProductsNotification(false); setFeasibilityLocationMatchNotification(false); onMarkAllNotificationsRead?.(); setNotificationPopoverOpen(false) }}
                         className="text-xs font-medium text-airtel-red hover:text-red-700"
                       >
                         Mark all as read
@@ -297,7 +327,7 @@ function Header({ activeNavTab = 'Quote', onNavClick, selectedQuote = 'Quote 1',
                   </div>
                   <div className="max-h-64 overflow-y-auto py-2">
                     {(() => {
-                      const mostRecent = updatedMacdUpgradeUpdateNotification ? 'macdUpgradeUpdate' : updatedTechnicalAttributesUpdateNotification ? 'technicalAttributesUpdate' : updatedEnrichQuoteUpdateNotification ? 'enrichQuoteUpdate' : updatedUpgradeQuoteNotification ? 'upgradeQuote' : updatedConfigurationsToQuoteNotification ? 'updatedConfigurationsToQuote' : validateQuoteNotification ? 'validatedQuote' : feasibilityProposalNotification ? 'feasibility' : updatedRequestedValuesNotification ? 'updatedRequestedValues' : updatedMatchedProductsNotification ? 'matchedProducts' : attributesUpdatedNotification ? 'attributes' : updatedQuoteProposal4Notification ? 'proposal4' : updatedQuoteProposal3Notification ? 'proposal3' : updatedQuoteProposal2Notification ? 'proposal2' : updatedQuoteNotification ? 'proposal1' : 'new'
+                      const mostRecent = updatedMacdUpgradeUpdateNotification ? 'macdUpgradeUpdate' : updatedTechnicalAttributesUpdateNotification ? 'technicalAttributesUpdate' : updatedEnrichQuoteUpdateNotification ? 'enrichQuoteUpdate' : updatedUpgradeQuoteNotification ? 'upgradeQuote' : updatedConfigurationsToQuoteNotification ? 'updatedConfigurationsToQuote' : validateQuoteNotification ? 'validatedQuote' : hdfcQuoteNotification ? 'hdfcQuote' : sbiQuoteNotification ? 'sbiQuote' : newQuoteLocationsExtractionNotification ? 'newQuoteLocationsExtraction' : feasibilityCheckNotification ? 'feasibilityCheck' : feasibilityValidateAddressNotification ? 'feasibilityValidateAddress' : feasibilityMatchedProductsNotification ? 'feasibilityMatchedProducts' : feasibilityLocationMatchNotification ? 'feasibilityLocationMatch' : feasibilityExtractionNotification ? 'feasibilityExtraction' : feasibilityProposalNotification ? 'feasibility' : updatedRequestedValuesNotification ? 'updatedRequestedValues' : updatedMatchedProductsNotification ? 'matchedProducts' : attributesUpdatedNotification ? 'attributes' : updatedQuoteProposal4Notification ? 'proposal4' : updatedQuoteProposal3Notification ? 'proposal3' : updatedQuoteProposal2Notification ? 'proposal2' : updatedQuoteNotification ? 'proposal1' : 'new'
                       const linkClass = (isRecent) => isRecent ? 'text-sm font-semibold text-airtel-red hover:text-red-800 hover:underline text-left w-full' : 'text-sm font-semibold text-gray-400 hover:text-gray-600 text-left w-full'
                       const timeClass = (isRecent) => isRecent ? 'text-xs text-gray-600 mt-0.5' : 'text-xs text-gray-400 mt-0.5'
                       return (
@@ -419,6 +449,146 @@ function Header({ activeNavTab = 'Quote', onNavClick, selectedQuote = 'Quote 1',
                           Updated proposal with Feasibility status
                         </button>
                         <p className={timeClass(mostRecent === 'feasibility')}>Just now</p>
+                      </div>
+                    )}
+                    {feasibilityCheckNotification && (
+                      <div className="px-4 py-3 hover:bg-grey-bg border-b border-gray-100">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            onNavigateToFeasibilityCheck?.()
+                            setFeasibilityCheckNotification(false)
+                            setNotificationPopoverOpen(false)
+                            setBellNotification(false)
+                            onMarkAllNotificationsRead?.()
+                          }}
+                          className={linkClass(mostRecent === 'feasibilityCheck')}
+                        >
+                          Checked feasibility for Extracted information for feasibility
+                        </button>
+                        <p className={timeClass(mostRecent === 'feasibilityCheck')}>Just now</p>
+                      </div>
+                    )}
+                    {feasibilityValidateAddressNotification && (
+                      <div className="px-4 py-3 hover:bg-grey-bg border-b border-gray-100">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            onNavigateToFeasibilityValidateAddress?.()
+                            setFeasibilityValidateAddressNotification(false)
+                            setNotificationPopoverOpen(false)
+                            setBellNotification(false)
+                            onMarkAllNotificationsRead?.()
+                          }}
+                          className={linkClass(mostRecent === 'feasibilityValidateAddress')}
+                        >
+                          Addresses Validated for Extracted information for feasibility
+                        </button>
+                        <p className={timeClass(mostRecent === 'feasibilityValidateAddress')}>Just now</p>
+                      </div>
+                    )}
+                    {feasibilityMatchedProductsNotification && (
+                      <div className="px-4 py-3 hover:bg-grey-bg border-b border-gray-100">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            onNavigateToFeasibilityMatchedProducts?.()
+                            setFeasibilityMatchedProductsNotification(false)
+                            setNotificationPopoverOpen(false)
+                            setBellNotification(false)
+                            onMarkAllNotificationsRead?.()
+                          }}
+                          className={linkClass(mostRecent === 'feasibilityMatchedProducts')}
+                        >
+                          Matched Products for Extracted information for feasibility
+                        </button>
+                        <p className={timeClass(mostRecent === 'feasibilityMatchedProducts')}>Just now</p>
+                      </div>
+                    )}
+                    {feasibilityLocationMatchNotification && (
+                      <div className="px-4 py-3 hover:bg-grey-bg border-b border-gray-100">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            onNavigateToFeasibilityLocationMatch?.()
+                            setFeasibilityLocationMatchNotification(false)
+                            setNotificationPopoverOpen(false)
+                            setBellNotification(false)
+                            onMarkAllNotificationsRead?.()
+                          }}
+                          className={linkClass(mostRecent === 'feasibilityLocationMatch')}
+                        >
+                          Matched Location for Premises for Extracted information for feasibility
+                        </button>
+                        <p className={timeClass(mostRecent === 'feasibilityLocationMatch')}>Just now</p>
+                      </div>
+                    )}
+                    {feasibilityExtractionNotification && (
+                      <div className="px-4 py-3 hover:bg-grey-bg border-b border-gray-100">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            onNavigateToFeasibilityExtraction?.()
+                            setNotificationPopoverOpen(false)
+                            setBellNotification(false)
+                            onMarkAllNotificationsRead?.()
+                          }}
+                          className={linkClass(mostRecent === 'feasibilityExtraction')}
+                        >
+                          Extracted Information for Feasibility check
+                        </button>
+                        <p className={timeClass(mostRecent === 'feasibilityExtraction')}>Just now</p>
+                      </div>
+                    )}
+                    {newQuoteLocationsExtractionNotification && (
+                      <div className="px-4 py-3 hover:bg-grey-bg border-b border-gray-100">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            onNavigateToNewQuoteLocationsExtraction?.()
+                            setNotificationPopoverOpen(false)
+                            setBellNotification(false)
+                            onMarkAllNotificationsRead?.()
+                          }}
+                          className={linkClass(mostRecent === 'newQuoteLocationsExtraction')}
+                        >
+                          {newQuoteLocationsExtractionLinkText}
+                        </button>
+                        <p className={timeClass(mostRecent === 'newQuoteLocationsExtraction')}>Just now</p>
+                      </div>
+                    )}
+                    {sbiQuoteNotification && (
+                      <div className="px-4 py-3 hover:bg-grey-bg border-b border-gray-100">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            onNavigateToSbiQuote?.()
+                            setNotificationPopoverOpen(false)
+                            setBellNotification(false)
+                            onMarkAllNotificationsRead?.()
+                          }}
+                          className={linkClass(mostRecent === 'sbiQuote')}
+                        >
+                          New Quote for SBI Bank Account
+                        </button>
+                        <p className={timeClass(mostRecent === 'sbiQuote')}>Just now</p>
+                      </div>
+                    )}
+                    {hdfcQuoteNotification && (
+                      <div className="px-4 py-3 hover:bg-grey-bg border-b border-gray-100">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            onNavigateToHdfcQuote?.()
+                            setNotificationPopoverOpen(false)
+                            setBellNotification(false)
+                            onMarkAllNotificationsRead?.()
+                          }}
+                          className={linkClass(mostRecent === 'hdfcQuote')}
+                        >
+                          Updated Quote for HDFC Bank account
+                        </button>
+                        <p className={timeClass(mostRecent === 'hdfcQuote')}>Just now</p>
                       </div>
                     )}
                     {updatedRequestedValuesNotification && (
@@ -571,6 +741,10 @@ function Header({ activeNavTab = 'Quote', onNavClick, selectedQuote = 'Quote 1',
           </div>
           {navItems.map((item) => {
             if (item.label === 'Quote') {
+              const isQuoteActive = activeNavTab === 'Quote'
+                && selectedQuote !== 'Request for Feasibility (Locations)'
+                && selectedQuote !== 'Request for New Quote - Locations'
+                && selectedQuote !== 'Request for New Quote - Locations + PO'
               return (
                 <div key={item.label} className="relative flex items-center shrink-0" ref={quoteDropdownRef}>
                   <button
@@ -582,10 +756,11 @@ function Header({ activeNavTab = 'Quote', onNavClick, selectedQuote = 'Quote 1',
                         const rect = quoteButtonRef.current.getBoundingClientRect()
                         setQuoteDropdownPosition({ top: rect.bottom + 4, left: rect.left })
                       }
+                      setFeasibilityDropdownOpen(false)
                       setQuoteDropdownOpen((prev) => !prev)
                     }}
                     className={`flex items-center gap-1 px-3 py-2 rounded-lg text-xs font-medium whitespace-nowrap ${
-                      activeNavTab === 'Quote'
+                      isQuoteActive
                         ? 'text-airtel-red font-semibold border-b-2 border-airtel-red pb-2 -mb-0.5 bg-transparent'
                         : 'text-gray-700 hover:bg-grey-bg'
                     }`}
@@ -613,6 +788,13 @@ function Header({ activeNavTab = 'Quote', onNavClick, selectedQuote = 'Quote 1',
                       </button>
                       <button
                         type="button"
+                        onClick={() => { onQuoteSelect?.('Quote 1 (2)'); setQuoteDropdownOpen(false); onNavClick?.('Quote') }}
+                        className={`w-full text-left px-4 py-2 text-xs font-medium whitespace-nowrap ${selectedQuote === 'Quote 1 (2)' ? 'text-airtel-red bg-red-50' : 'text-gray-700 hover:bg-grey-bg'}`}
+                      >
+                        Create Quote (2)
+                      </button>
+                      <button
+                        type="button"
                         onClick={() => { onQuoteSelect?.('Quote 2'); setQuoteDropdownOpen(false); onNavClick?.('Quote') }}
                         className={`w-full text-left px-4 py-2 text-xs font-medium whitespace-nowrap ${selectedQuote === 'Quote 2' ? 'text-airtel-red bg-red-50' : 'text-gray-700 hover:bg-grey-bg'}`}
                       >
@@ -624,6 +806,74 @@ function Header({ activeNavTab = 'Quote', onNavClick, selectedQuote = 'Quote 1',
                         className={`w-full text-left px-4 py-2 text-xs font-medium whitespace-nowrap ${selectedQuote === 'MACD Quote' ? 'text-airtel-red bg-red-50' : 'text-gray-700 hover:bg-grey-bg'}`}
                       >
                         MACD Quote
+                      </button>
+                    </div>,
+                    document.body
+                  )}
+                </div>
+              )
+            }
+            if (item.label === 'Feasibility Request') {
+              const isFeasibilityActive = activeNavTab === 'Quote'
+                && (
+                  selectedQuote === 'Request for Feasibility (Locations)'
+                  || selectedQuote === 'Request for New Quote - Locations'
+                  || selectedQuote === 'Request for New Quote - Locations + PO'
+                )
+              return (
+                <div key={item.label} className="relative flex items-center shrink-0" ref={feasibilityDropdownRef}>
+                  <button
+                    ref={feasibilityButtonRef}
+                    type="button"
+                    onClick={() => {
+                      onNavClick?.('Quote')
+                      if (feasibilityButtonRef.current) {
+                        const rect = feasibilityButtonRef.current.getBoundingClientRect()
+                        setFeasibilityDropdownPosition({ top: rect.bottom + 4, left: rect.left })
+                      }
+                      setQuoteDropdownOpen(false)
+                      setFeasibilityDropdownOpen((prev) => !prev)
+                    }}
+                    className={`flex items-center gap-1 px-3 py-2 rounded-lg text-xs font-medium whitespace-nowrap ${
+                      isFeasibilityActive
+                        ? 'text-airtel-red font-semibold border-b-2 border-airtel-red pb-2 -mb-0.5 bg-transparent'
+                        : 'text-gray-700 hover:bg-grey-bg'
+                    }`}
+                    aria-expanded={feasibilityDropdownOpen}
+                    aria-haspopup="listbox"
+                  >
+                    Feasibility Request
+                    <svg className="w-3.5 h-3.5 text-current" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+                    </svg>
+                  </button>
+                  {feasibilityDropdownOpen && createPortal(
+                    <div
+                      data-feasibility-dropdown
+                      className="fixed z-[100] min-w-[180px] bg-white rounded-lg shadow-lg border border-gray-200 py-1"
+                      style={{ top: feasibilityDropdownPosition.top, left: feasibilityDropdownPosition.left }}
+                      role="listbox"
+                    >
+                      <button
+                        type="button"
+                        onClick={() => { onQuoteSelect?.('Request for Feasibility (Locations)'); setFeasibilityDropdownOpen(false); onNavClick?.('Quote') }}
+                        className={`w-full text-left px-4 py-2 text-xs font-medium whitespace-nowrap ${selectedQuote === 'Request for Feasibility (Locations)' ? 'text-airtel-red bg-red-50' : 'text-gray-700 hover:bg-grey-bg'}`}
+                      >
+                        Request for Feasibility (Locations)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { onQuoteSelect?.('Request for New Quote - Locations'); setFeasibilityDropdownOpen(false); onNavClick?.('Quote') }}
+                        className={`w-full text-left px-4 py-2 text-xs font-medium whitespace-nowrap ${selectedQuote === 'Request for New Quote - Locations' ? 'text-airtel-red bg-red-50' : 'text-gray-700 hover:bg-grey-bg'}`}
+                      >
+                        Request for New Quote - Locations
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { onQuoteSelect?.('Request for New Quote - Locations + PO'); setFeasibilityDropdownOpen(false); onNavClick?.('Quote') }}
+                        className={`w-full text-left px-4 py-2 text-xs font-medium whitespace-nowrap ${selectedQuote === 'Request for New Quote - Locations + PO' ? 'text-airtel-red bg-red-50' : 'text-gray-700 hover:bg-grey-bg'}`}
+                      >
+                        Request for New Quote - Locations + PO
                       </button>
                     </div>,
                     document.body
@@ -673,6 +923,7 @@ function Header({ activeNavTab = 'Quote', onNavClick, selectedQuote = 'Quote 1',
         onNavigateToVerifiedDetails={handleNavigateToVerifiedDetails}
         onNavigateToAddedProductsFromExtracted={handleNavigateToAddedProductsFromExtracted}
         onNavigateToFeasibilityProposal={onNavigateToFeasibilityProposal}
+        onNavigateToFeasibilityExtraction={onNavigateToFeasibilityExtraction}
         onNavigateToValidatedQuote={onNavigateToValidatedQuote}
         onNavigateToUpdatedRequestedValues={(intentText) => {
           onNavigateToUpdatedRequestedValues?.(intentText)
@@ -700,6 +951,64 @@ function Header({ activeNavTab = 'Quote', onNavClick, selectedQuote = 'Quote 1',
         }}
         onAddProductsAnalysisStart={onAddProductsAnalysisStart}
         onAddProductsAnalysisEnd={onAddProductsAnalysisEnd}
+        onFeasibilityCheckStatusShown={() => {
+          setBellNotification(true)
+          setNotificationPopoverOpen(true)
+          setFeasibilityCheckNotification(true)
+          onFeasibilityCheckStatusShown?.()
+        }}
+        onNavigateToFeasibilityCheck={() => {
+          onNavigateToFeasibilityCheck?.()
+          setFeasibilityCheckNotification(false)
+        }}
+        onSbiQuoteStatusShown={() => {
+          setBellNotification(true)
+          setNotificationPopoverOpen(true)
+          onSbiQuoteStatusShown?.()
+        }}
+        onNavigateToSbiQuote={onNavigateToSbiQuote}
+        onFeasibilityValidateAddressStatusShown={() => {
+          setBellNotification(true)
+          setNotificationPopoverOpen(true)
+          setFeasibilityValidateAddressNotification(true)
+          onFeasibilityValidateAddressStatusShown?.()
+        }}
+        onNavigateToFeasibilityValidateAddress={() => {
+          onNavigateToFeasibilityValidateAddress?.()
+          setFeasibilityValidateAddressNotification(false)
+        }}
+        onFeasibilityMatchedProductsStatusShown={() => {
+          setBellNotification(true)
+          setNotificationPopoverOpen(true)
+          setFeasibilityMatchedProductsNotification(true)
+          onFeasibilityMatchedProductsStatusShown?.()
+        }}
+        onNavigateToFeasibilityMatchedProducts={() => {
+          onNavigateToFeasibilityMatchedProducts?.()
+          setFeasibilityMatchedProductsNotification(false)
+        }}
+        onFeasibilityLocationMatchAnalysisStart={onFeasibilityLocationMatchAnalysisStart}
+        onNavigateToFeasibilityLocationMatch={() => {
+          onNavigateToFeasibilityLocationMatch?.()
+          setFeasibilityLocationMatchNotification(false)
+        }}
+        onFeasibilityLocationMatchStatusShown={() => {
+          setBellNotification(true)
+          setNotificationPopoverOpen(true)
+          setFeasibilityLocationMatchNotification(true)
+          onFeasibilityLocationMatchStatusShown?.()
+        }}
+        onFeasibilityExtractionStatusShown={() => {
+          setBellNotification(true)
+          setNotificationPopoverOpen(true)
+          onFeasibilityExtractionStatusShown?.()
+        }}
+        onNavigateToNewQuoteLocationsExtraction={onNavigateToNewQuoteLocationsExtraction}
+        onNewQuoteLocationsExtractionStatusShown={(accountName) => {
+          setBellNotification(true)
+          setNotificationPopoverOpen(true)
+          onNewQuoteLocationsExtractionStatusShown?.(accountName)
+        }}
         onUpdateChangeAnalysisStart={onUpdateChangeAnalysisStart}
         onUpdateChangeAnalysisEnd={onUpdateChangeAnalysisEnd}
         onPOChangeUpdateAnalysisStart={onPOChangeUpdateAnalysisStart}
@@ -732,6 +1041,11 @@ function Header({ activeNavTab = 'Quote', onNavClick, selectedQuote = 'Quote 1',
         }}
         onNavigateToMacdUpgradeUpdate={onNavigateToMacdUpgradeUpdate}
         onMacdUpgradeUpdateAnalysisStart={onMacdUpgradeUpdateAnalysisStart}
+        feasibilityRequestsPageActive={activeNavTab === 'Quote' && (
+          selectedQuote === 'Request for Feasibility (Locations)'
+          || selectedQuote === 'Request for New Quote - Locations'
+          || selectedQuote === 'Request for New Quote - Locations + PO'
+        )}
         initialRestoreSnapshot={snapshotToPass}
         onPanelStateChange={(snapshot) => {
           panelStateRef.current = snapshot

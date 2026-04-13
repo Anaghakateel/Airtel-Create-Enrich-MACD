@@ -13,6 +13,7 @@ import QuoteProposalPage from './components/QuoteProposalPage'
 import SelectQuoteLineItemsPage, { getTechnicalAttributesOverridesFromIntent } from './components/SelectQuoteLineItemsPage'
 import TechnicalEnrichmentPage from './components/TechnicalEnrichmentPage'
 import TechnicalAttributesPage from './components/TechnicalAttributesPage'
+import RequestFeasibilityLocationsPage from './components/RequestFeasibilityLocationsPage'
 import { LocationsProvider } from './context/LocationsContext'
 import { SAMPLE_LOCATIONS } from './data/sampleLocations'
 
@@ -99,6 +100,28 @@ function App() {
   const [validateQuoteInProgress, setValidateQuoteInProgress] = useState(false)
   const [validateQuoteComplete, setValidateQuoteComplete] = useState(false) // status becomes "Validated"
   const [validateQuoteSuccessBannerDismissed, setValidateQuoteSuccessBannerDismissed] = useState(false) // hide banner on X, status stays Validated
+  const [feasibilityExtractionNotification, setFeasibilityExtractionNotification] = useState(false)
+  const [feasibilityExtractionInProgress, setFeasibilityExtractionInProgress] = useState(false)
+  const [feasibilityCheckNavigateSignal, setFeasibilityCheckNavigateSignal] = useState(0)
+  const [feasibilityValidateAddressNavigateSignal, setFeasibilityValidateAddressNavigateSignal] = useState(0)
+  const [feasibilityMatchedProductsNavigateSignal, setFeasibilityMatchedProductsNavigateSignal] = useState(0)
+  const [feasibilityLocationMatchAnalysisOverlayVisible, setFeasibilityLocationMatchAnalysisOverlayVisible] = useState(false)
+  const [feasibilityLocationMatchStartSignal, setFeasibilityLocationMatchStartSignal] = useState(0)
+  const [feasibilityLocationMatchNavigateSignal, setFeasibilityLocationMatchNavigateSignal] = useState(0)
+  const [newQuoteLocationsExtractionNotification, setNewQuoteLocationsExtractionNotification] = useState(false)
+  const [newQuoteLocationsExtractionInProgress, setNewQuoteLocationsExtractionInProgress] = useState(false)
+  const [newQuoteLocationsExtractionLinkText, setNewQuoteLocationsExtractionLinkText] = useState('Extracted Information for HDFC Bank account')
+  const [convertToQuoteOverlayVisible, setConvertToQuoteOverlayVisible] = useState(false)
+  const [sbiQuoteNotification, setSbiQuoteNotification] = useState(false)
+  const [sbiQuoteCreationLoading, setSbiQuoteCreationLoading] = useState(false)
+  const [pendingSbiFeasibilityRowIds, setPendingSbiFeasibilityRowIds] = useState([])
+  const [sbiQuoteLocations, setSbiQuoteLocations] = useState([])
+  const [hdfcQuoteNotification, setHdfcQuoteNotification] = useState(false)
+  const [hdfcQuoteUpdateLoading, setHdfcQuoteUpdateLoading] = useState(false)
+  const [pendingHdfcFeasibilityRowIds, setPendingHdfcFeasibilityRowIds] = useState([])
+  const [hdfcQuoteLocations, setHdfcQuoteLocations] = useState([])
+  const [hdfcQuoteFeasibilityRequestId, setHdfcQuoteFeasibilityRequestId] = useState('FR-0002')
+  const [hdfcQuoteNavigateSignal, setHdfcQuoteNavigateSignal] = useState(0)
   const [currentPage, setCurrentPage] = useState(() => {
     const stored = getStoredQuoteRestore()
     return stored?.tab === 'Quote' ? 'Quote' : 'Home'
@@ -117,6 +140,7 @@ function App() {
   const [showMatchAllOverlay, setShowMatchAllOverlay] = useState(false)
   const [showValidateOverlay, setShowValidateOverlay] = useState(false)
   const [showContinueValidOverlay, setShowContinueValidOverlay] = useState(false)
+  const [quote2AddressValidated, setQuote2AddressValidated] = useState(false)
   const [showContinueSummaryOverlay, setShowContinueSummaryOverlay] = useState(false)
   const [attributesViewLoadingInProgress, setAttributesViewLoadingInProgress] = useState(false)
   const [showMatchedProductsOverlay, setShowMatchedProductsOverlay] = useState(false)
@@ -149,6 +173,8 @@ function App() {
   const macdUpgradeUpdateIntentRef = useRef(null)
 
   const quote1Locations = locationsForSummaryTab?.length ? locationsForSummaryTab : locationsForDownstreamTabs
+  const visibleSbiQuoteLocations = sbiQuoteLocations?.length ? sbiQuoteLocations : quote1Locations
+  const visibleHdfcQuoteLocations = hdfcQuoteLocations?.length ? hdfcQuoteLocations : quote1Locations
   const technicalAttributesInternetLocationIds = useMemo(() => {
     const products = ['Internet', 'SD WAN', 'MPLS']
     return new Set(
@@ -157,6 +183,17 @@ function App() {
   }, [quote1Locations])
 
   const activeNavTab = currentPage
+  const isCreateQuote2Flow = selectedQuote === 'Quote 1 (2)' && activeTab === 'Extracted Information'
+
+  useEffect(() => {
+    if (selectedQuote !== 'Quote 1 (2)') return
+    setQuote2AddressValidated(false)
+    setValidationComplete(false)
+    setValidatedRecordCount(0)
+    setValidatedRecordIds(new Set())
+    setValidationByRowId(null)
+    setValidationResult(null)
+  }, [selectedQuote])
 
   useEffect(() => {
     if (activeTab !== 'Summary') setSummaryFeasibilityEmptyInitially(false)
@@ -180,6 +217,101 @@ function App() {
     setHasUpgradeQuoteNotification(false)
     setTimeout(() => setExtractionInProgress(false), 2000)
   }, [])
+
+  const onNavigateToFeasibilityExtraction = useCallback(() => {
+    setFeasibilityExtractionNotification(false)
+    setCurrentPage('Quote')
+    setSelectedQuote('Request for Feasibility (Locations)')
+    setFeasibilityExtractionInProgress(true)
+    setTimeout(() => setFeasibilityExtractionInProgress(false), 2000)
+  }, [])
+
+  const onNavigateToNewQuoteLocationsExtraction = useCallback(() => {
+    setNewQuoteLocationsExtractionNotification(false)
+    setNewQuoteLocationsExtractionInProgress(true)
+    setTimeout(() => {
+      setNewQuoteLocationsExtractionInProgress(false)
+      setCurrentPage('Quote')
+      setSelectedQuote('Request for New Quote - Locations')
+      setShowEnrichQuotePage(false)
+      setShowTechnicalAttributesPage(false)
+    }, 2000)
+  }, [])
+
+  const onConvertToSbiOpportunityAndQuote = useCallback((selectedRowIds = []) => {
+    setPendingSbiFeasibilityRowIds(Array.isArray(selectedRowIds) ? selectedRowIds : [])
+    setSbiQuoteNotification(false)
+    setConvertToQuoteOverlayVisible(true)
+    setTimeout(() => {
+      setSbiQuoteNotification(true)
+    }, 1000)
+  }, [])
+
+  const onNavigateToSbiQuote = useCallback(() => {
+    setSbiQuoteNotification(false)
+    setConvertToQuoteOverlayVisible(false)
+    setSbiQuoteCreationLoading(true)
+    setTimeout(() => {
+      const sourceLocations = quote1Locations || []
+      const parsedIndexes = (pendingSbiFeasibilityRowIds || [])
+        .map((id) => Number(String(id || '').match(/rf-row-(\d+)/)?.[1]))
+        .filter((n) => Number.isFinite(n) && n > 0)
+        .sort((a, b) => a - b)
+      const nextSbiLocations = parsedIndexes.length > 0 && sourceLocations.length > 0
+        ? parsedIndexes
+          .map((n) => sourceLocations[(n - 1) % sourceLocations.length])
+          .filter(Boolean)
+          .map((loc, idx) => {
+            const rowNo = parsedIndexes[idx] || (idx + 1)
+            return { ...loc, feasibilityStatus: rowNo % 6 === 0 ? 'Not Feasible' : 'Feasible' }
+          })
+        : (sourceLocations || []).map((loc, idx) => ({ ...loc, feasibilityStatus: (idx + 1) % 6 === 0 ? 'Not Feasible' : 'Feasible' }))
+      setSbiQuoteLocations(nextSbiLocations)
+      setSbiQuoteCreationLoading(false)
+      setCurrentPage('Quote')
+      setSelectedQuote('SBI Bank Quote')
+      setActiveTab('Summary')
+      setShowEnrichQuotePage(false)
+      setShowTechnicalAttributesPage(false)
+      setPendingSbiFeasibilityRowIds([])
+    }, 2000)
+  }, [pendingSbiFeasibilityRowIds, quote1Locations])
+
+  const onHdfcFeasibilityQuoteStatusShown = useCallback((selectedRowIds = []) => {
+    setPendingHdfcFeasibilityRowIds(Array.isArray(selectedRowIds) ? selectedRowIds : [])
+    setHdfcQuoteNotification(true)
+  }, [])
+
+  const onNavigateToHdfcQuote = useCallback(() => {
+    setHdfcQuoteNotification(false)
+    setHdfcQuoteNavigateSignal((v) => v + 1)
+    setHdfcQuoteUpdateLoading(true)
+    setHdfcQuoteFeasibilityRequestId(selectedQuote === 'Request for New Quote - Locations + PO' ? 'FR-0003' : 'FR-0002')
+    setTimeout(() => {
+      const sourceLocations = quote1Locations || []
+      const parsedIndexes = (pendingHdfcFeasibilityRowIds || [])
+        .map((id) => Number(String(id || '').match(/rf-row-(\d+)/)?.[1]))
+        .filter((n) => Number.isFinite(n) && n > 0)
+        .sort((a, b) => a - b)
+      const nextHdfcLocations = parsedIndexes.length > 0 && sourceLocations.length > 0
+        ? parsedIndexes
+          .map((n) => sourceLocations[(n - 1) % sourceLocations.length])
+          .filter(Boolean)
+          .map((loc, idx) => {
+            const rowNo = parsedIndexes[idx] || (idx + 1)
+            return { ...loc, feasibilityStatus: rowNo % 6 === 0 ? 'Not Feasible' : 'Feasible' }
+          })
+        : (sourceLocations || []).map((loc, idx) => ({ ...loc, feasibilityStatus: (idx + 1) % 6 === 0 ? 'Not Feasible' : 'Feasible' }))
+      setHdfcQuoteLocations(nextHdfcLocations)
+      setHdfcQuoteUpdateLoading(false)
+      setCurrentPage('Quote')
+      setSelectedQuote('HDFC Bank Quote')
+      setActiveTab('Summary')
+      setShowEnrichQuotePage(false)
+      setShowTechnicalAttributesPage(false)
+      setPendingHdfcFeasibilityRowIds([])
+    }, 2000)
+  }, [pendingHdfcFeasibilityRowIds, quote1Locations, selectedQuote])
 
   const onNavigateToEnrichQuoteUpdate = useCallback((intentText) => {
     setShowPOChangeUpdateOverlay(false)
@@ -268,6 +400,7 @@ function App() {
   const handleUpdateLocation = useCallback((locationId, updates) => {
     setLocationsData((prev) => prev.map((loc) => (loc.id === locationId ? { ...loc, ...updates } : loc)))
     setLocationsForDownstreamTabs((prev) => prev.map((loc) => (loc.id === locationId ? { ...loc, ...updates } : loc)))
+    setSbiQuoteLocations((prev) => prev.map((loc) => (loc.id === locationId ? { ...loc, ...updates } : loc)))
   }, [])
 
   const handleDeleteLocations = useCallback((ids) => {
@@ -275,6 +408,7 @@ function App() {
     const idSet = new Set(ids)
     setLocationsData((prev) => prev.filter((loc) => !idSet.has(loc.id)))
     setLocationsForDownstreamTabs((prev) => prev.filter((loc) => !idSet.has(loc.id)))
+    setSbiQuoteLocations((prev) => prev.filter((loc) => !idSet.has(loc.id)))
   }, [])
 
   const onRevealComplete = useCallback(() => {
@@ -318,6 +452,19 @@ function App() {
       if (rowIds.length) quoteActionsRef.current?.showUpdatedBadgeForRows?.(rowIds, 1000)
     }, 2000)
   }, [])
+
+  const isSbiQuoteActive = currentPage === 'Quote' && selectedQuote === 'SBI Bank Quote'
+  const isHdfcQuoteActive = currentPage === 'Quote' && selectedQuote === 'HDFC Bank Quote'
+  const quoteContentLocations = isSbiQuoteActive
+    ? visibleSbiQuoteLocations
+    : isHdfcQuoteActive
+      ? visibleHdfcQuoteLocations
+      : locationsForDownstreamTabs
+  const quoteSummaryLocations = isSbiQuoteActive
+    ? visibleSbiQuoteLocations
+    : isHdfcQuoteActive
+      ? visibleHdfcQuoteLocations
+      : locationsForSummaryTab
 
   return (
     <div className="min-h-screen bg-white flex flex-col">
@@ -400,6 +547,49 @@ function App() {
           <p className="text-sm font-semibold text-gray-700">Updating the values...</p>
         </div>
       )}
+      {feasibilityExtractionInProgress && (
+        <div className="fixed inset-x-0 bottom-0 top-16 z-50 flex flex-col items-center justify-center gap-3 bg-white/95" aria-live="polite">
+          <div className="flex gap-1" aria-hidden="true">
+            {[0, 1, 2, 3, 4].map((i) => (
+              <span key={i} className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" style={{ animationDelay: `${i * 0.1}s` }} />
+            ))}
+          </div>
+          <p className="text-sm font-semibold text-gray-700">Extraction for feasibility check in progress..</p>
+        </div>
+      )}
+      {newQuoteLocationsExtractionInProgress && (
+        <div className="fixed inset-x-0 bottom-0 top-16 z-50 flex flex-col items-center justify-center gap-3 bg-white/95" aria-live="polite">
+          <div className="flex gap-1" aria-hidden="true">
+            {[0, 1, 2, 3, 4].map((i) => (
+              <span key={i} className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" style={{ animationDelay: `${i * 0.1}s` }} />
+            ))}
+          </div>
+          <p className="text-sm font-semibold text-gray-700">Extracting information in progress..</p>
+        </div>
+      )}
+      {convertToQuoteOverlayVisible && (
+        <div className="fixed inset-x-0 bottom-0 top-16 z-40 bg-white/70 pointer-events-none" aria-hidden />
+      )}
+      {sbiQuoteCreationLoading && (
+        <div className="fixed inset-x-0 bottom-0 top-16 z-50 flex flex-col items-center justify-center gap-3 bg-white/95" aria-live="polite">
+          <div className="flex gap-1" aria-hidden="true">
+            {[0, 1, 2, 3, 4].map((i) => (
+              <span key={i} className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" style={{ animationDelay: `${i * 0.1}s` }} />
+            ))}
+          </div>
+          <p className="text-sm font-semibold text-gray-700">Creating Opportunity and Quote in progress...</p>
+        </div>
+      )}
+      {hdfcQuoteUpdateLoading && (
+        <div className="fixed inset-x-0 bottom-0 top-16 z-50 flex flex-col items-center justify-center gap-3 bg-white/95" aria-live="polite">
+          <div className="flex gap-1" aria-hidden="true">
+            {[0, 1, 2, 3, 4].map((i) => (
+              <span key={i} className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" style={{ animationDelay: `${i * 0.1}s` }} />
+            ))}
+          </div>
+          <p className="text-sm font-semibold text-gray-700">Updating Quote in progress</p>
+        </div>
+      )}
       <Header
         activeNavTab={activeNavTab}
         onNavClick={onNavClick}
@@ -475,7 +665,7 @@ function App() {
         updatedRequestedValuesNotification={hasUpdatedRequestedValuesNotification}
         onNavigateToUpdatedRequestedValues={onNavigateToUpdatedRequestedValues}
         onUpdatedRequestedValuesCreated={onUpdatedRequestedValuesCreated}
-        onMarkAllNotificationsRead={() => { setHasUpdatedRequestedValuesNotification(false); setFeasibilityProposalNotification(false); setValidateQuoteNotification(false); setUpdatedConfigurationsToQuoteNotification(false); setHasUpgradeQuoteNotification(false); setHasEnrichQuoteUpdateNotification(false); setHasTechnicalAttributesUpdateNotification(false); setHasMacdUpgradeUpdateNotification(false) }}
+        onMarkAllNotificationsRead={() => { setHasUpdatedRequestedValuesNotification(false); setFeasibilityProposalNotification(false); setValidateQuoteNotification(false); setUpdatedConfigurationsToQuoteNotification(false); setHasUpgradeQuoteNotification(false); setHasEnrichQuoteUpdateNotification(false); setHasTechnicalAttributesUpdateNotification(false); setHasMacdUpgradeUpdateNotification(false); setFeasibilityExtractionNotification(false); setNewQuoteLocationsExtractionNotification(false); setSbiQuoteNotification(false); setHdfcQuoteNotification(false) }}
         updatedUpgradeQuoteNotification={hasUpgradeQuoteNotification}
         onNavigateToUpgradeQuote={onNavigateToUpgradeQuote}
         onUpgradeQuoteCreated={() => setHasUpgradeQuoteNotification(true)}
@@ -519,6 +709,42 @@ function App() {
             setFeasibilityCheckComplete(true)
           }, 2000)
         }}
+        feasibilityExtractionNotification={feasibilityExtractionNotification}
+        onNavigateToFeasibilityExtraction={onNavigateToFeasibilityExtraction}
+        onFeasibilityExtractionStatusShown={() => setFeasibilityExtractionNotification(true)}
+        onNavigateToFeasibilityCheck={() => {
+          setFeasibilityCheckNavigateSignal((v) => v + 1)
+        }}
+        onNavigateToFeasibilityValidateAddress={() => {
+          setFeasibilityValidateAddressNavigateSignal((v) => v + 1)
+        }}
+        onNavigateToFeasibilityMatchedProducts={() => {
+          setFeasibilityMatchedProductsNavigateSignal((v) => v + 1)
+        }}
+        onFeasibilityLocationMatchAnalysisStart={() => setFeasibilityLocationMatchAnalysisOverlayVisible(true)}
+        onFeasibilityLocationMatchStatusShown={() => {
+          setFeasibilityLocationMatchAnalysisOverlayVisible(false)
+          setFeasibilityLocationMatchStartSignal((v) => v + 1)
+        }}
+        onNavigateToFeasibilityLocationMatch={() => {
+          setFeasibilityLocationMatchNavigateSignal((v) => v + 1)
+        }}
+        newQuoteLocationsExtractionNotification={newQuoteLocationsExtractionNotification}
+        newQuoteLocationsExtractionLinkText={newQuoteLocationsExtractionLinkText}
+        onNavigateToNewQuoteLocationsExtraction={onNavigateToNewQuoteLocationsExtraction}
+        onNewQuoteLocationsExtractionStatusShown={(accountName) => {
+          const cleanedName = String(accountName || 'HDFC Bank').replace(/\s+Account$/i, '').trim() || 'HDFC Bank'
+          setNewQuoteLocationsExtractionLinkText(`Extracted Information for ${cleanedName} account`)
+          setNewQuoteLocationsExtractionNotification(true)
+        }}
+        sbiQuoteNotification={sbiQuoteNotification}
+        onSbiQuoteStatusShown={() => {
+          setPendingSbiFeasibilityRowIds([])
+          setSbiQuoteNotification(true)
+        }}
+        onNavigateToSbiQuote={onNavigateToSbiQuote}
+        hdfcQuoteNotification={hdfcQuoteNotification}
+        onNavigateToHdfcQuote={onNavigateToHdfcQuote}
         validateQuoteNotification={validateQuoteNotification}
         onNavigateToValidatedQuote={() => {
           setValidateQuoteNotification(false)
@@ -557,7 +783,7 @@ function App() {
         onTechnicalAttributesToggleCompareWithAsset={() => setCompareWithAsset(true)}
       />
       <main className="flex-1 flex flex-col p-6 max-w-[1920px] w-full mx-auto pb-4 min-h-0">
-        <LocationsProvider value={{ locations: locationsForDownstreamTabs, onUpdateLocation: handleUpdateLocation, onDeleteLocations: handleDeleteLocations }}>
+        <LocationsProvider value={{ locations: currentPage === 'Quote' ? quoteContentLocations : locationsForDownstreamTabs, onUpdateLocation: handleUpdateLocation, onDeleteLocations: handleDeleteLocations }}>
         {currentPage === 'Home' && (
           <HomePage
             onRefresh={() => {
@@ -571,7 +797,60 @@ function App() {
           <>
             {selectedQuote === 'Technical Enrichment' ? (
               <TechnicalEnrichmentPage />
-            ) : (selectedQuote === 'Quote 1' || selectedQuote === 'MACD Quote') ? (
+            ) : (
+              selectedQuote === 'Request for Feasibility (Locations)'
+              || selectedQuote === 'Request for New Quote - Locations'
+              || selectedQuote === 'Request for New Quote - Locations + PO'
+            ) ? (
+              <RequestFeasibilityLocationsPage
+                quote1Locations={quoteSummaryLocations?.length ? quoteSummaryLocations : quoteContentLocations}
+                feasibilityPageName={
+                  selectedQuote === 'Request for New Quote - Locations + PO'
+                    ? 'Feasibility of HDFC Bank (Locations+PO)'
+                    : selectedQuote === 'Request for New Quote - Locations'
+                      ? 'Feasibility of HDFC Bank (Locations)'
+                      : 'Feasibility of SBI Bank'
+                }
+                feasibilityRequestId={
+                  selectedQuote === 'Request for New Quote - Locations + PO'
+                    ? 'FR-0003'
+                    : selectedQuote === 'Request for New Quote - Locations'
+                      ? 'FR-0002'
+                      : 'FR-0001'
+                }
+                accountName={
+                  selectedQuote === 'Request for New Quote - Locations + PO' || selectedQuote === 'Request for New Quote - Locations'
+                    ? 'HDFC Bank'
+                    : 'SBI Bank'
+                }
+                opportunityName={
+                  selectedQuote === 'Request for New Quote - Locations + PO' || selectedQuote === 'Request for New Quote - Locations'
+                    ? 'HDFC Bank - New opportunity'
+                    : ''
+                }
+                quoteName={
+                  selectedQuote === 'Request for New Quote - Locations + PO' || selectedQuote === 'Request for New Quote - Locations'
+                    ? 'HDFC Bank Quote'
+                    : ''
+                }
+                showUpdateQuoteOnly={
+                  selectedQuote === 'Request for New Quote - Locations + PO' || selectedQuote === 'Request for New Quote - Locations'
+                }
+                onFeasibilityQuoteStatusShown={
+                  selectedQuote === 'Request for New Quote - Locations + PO' || selectedQuote === 'Request for New Quote - Locations'
+                    ? onHdfcFeasibilityQuoteStatusShown
+                    : undefined
+                }
+                onConvertToOpportunityAndQuote={onConvertToSbiOpportunityAndQuote}
+                externalCheckFeasibilityNavigateSignal={feasibilityCheckNavigateSignal}
+                externalValidateAddressNavigateSignal={feasibilityValidateAddressNavigateSignal}
+                externalMatchProductsNavigateSignal={feasibilityMatchedProductsNavigateSignal}
+                externalFeasibilityQuoteNavigateSignal={hdfcQuoteNavigateSignal}
+                externalLocationMatchOverlayVisible={feasibilityLocationMatchAnalysisOverlayVisible}
+                externalLocationMatchStartSignal={feasibilityLocationMatchStartSignal}
+                externalLocationMatchNavigateSignal={feasibilityLocationMatchNavigateSignal}
+              />
+            ) : (selectedQuote === 'Quote 1' || selectedQuote === 'Quote 1 (2)' || selectedQuote === 'MACD Quote' || selectedQuote === 'SBI Bank Quote' || selectedQuote === 'HDFC Bank Quote') ? (
             <div className="relative flex flex-col flex-1 min-h-0">
             {validateQuoteComplete && !validateQuoteSuccessBannerDismissed && (
               <div className="absolute top-0 left-1/2 -translate-x-1/2 z-10 flex items-center justify-center" role="status">
@@ -633,11 +912,14 @@ function App() {
               arcTotal={0}
               monthlyTotal={summaryTotals.monthlyTotal}
               quoteTotal={summaryTotals.quoteTotal}
+              quoteTitle={selectedQuote === 'SBI Bank Quote' ? 'SBI Bank Quote' : selectedQuote === 'HDFC Bank Quote' ? 'HDFC Bank Quote' : 'HDFC bank connectivity across India'}
+              showExtractedInformationTab={selectedQuote !== 'SBI Bank Quote' && selectedQuote !== 'HDFC Bank Quote'}
+              feasibilityRequestId={selectedQuote === 'SBI Bank Quote' ? 'FR-0001' : selectedQuote === 'HDFC Bank Quote' ? hdfcQuoteFeasibilityRequestId : ''}
               activeTab={activeTab}
               onTabChange={setActiveTab}
               extractedInfoCount={extractedRecordCount}
-              locationsCount={locationsForDownstreamTabs.length}
-              summaryCount={locationsForSummaryTab.length}
+              locationsCount={quoteContentLocations.length}
+              summaryCount={quoteSummaryLocations.length}
               onCheckFeasibility={() => {
                 setActiveTab('Summary')
                 setCheckFeasibilityOverlayOnSummary(true)
@@ -684,7 +966,7 @@ function App() {
                     <ConfigurationCartView
                       row={editingSummaryRow}
                       selectedRowIds={selectedSummaryRowIdsForConfig}
-                      summaryLocations={locationsForSummaryTab?.length ? locationsForSummaryTab : locationsForDownstreamTabs}
+                      summaryLocations={quoteSummaryLocations?.length ? quoteSummaryLocations : quoteContentLocations}
                       updatedProductRowIds={summaryUpdatedProductRowIds}
                       showFeasibilityResults={feasibilityCheckComplete}
                       onBack={() => {
@@ -711,11 +993,11 @@ function App() {
                       locations={
                       editingSummaryRow?.product === 'Internet'
                         ? (() => {
-                            const summaryRows = buildSummaryRows(locationsForSummaryTab)
+                            const summaryRows = buildSummaryRows(quoteSummaryLocations)
                             const internetIds = new Set(summaryRows.filter((r) => r.product === 'Internet').map((r) => r.id))
-                            return locationsForDownstreamTabs.filter((loc) => internetIds.has(loc.id))
+                            return quoteContentLocations.filter((loc) => internetIds.has(loc.id))
                           })()
-                        : locationsForDownstreamTabs
+                        : quoteContentLocations
                     }
                     onUpdateLocation={handleUpdateLocation}
                     onDeleteLocations={handleDeleteLocations}
@@ -747,7 +1029,7 @@ function App() {
                       </div>
                     )}
                     <SummaryTabContent
-                      locations={locationsForSummaryTab}
+                      locations={quoteSummaryLocations}
                       onTotalsChange={setSummaryTotals}
                       onEditRow={(row, selectedIds) => {
                         setEditingSummaryRow(row)
@@ -803,6 +1085,7 @@ function App() {
               ) : (
                 <DataTableSection
                   isMacdQuote={selectedQuote === 'MACD Quote'}
+                  isCreateQuote2Flow={isCreateQuote2Flow}
                   continuedRecordIds={continuedRecordIds}
                   validationByRowId={validationByRowId}
                   validationResult={validationResult}
@@ -842,6 +1125,12 @@ function App() {
             </div>
             {activeTab === 'Extracted Information' && !extractionInProgress && (
               <FooterActions
+                showValidateAddressButton={isCreateQuote2Flow}
+                isAddressValidated={!isCreateQuote2Flow || quote2AddressValidated}
+                onValidateAddress={() => {
+                  setQuote2AddressValidated(true)
+                  quoteActionsRef.current?.validateAddressesForQuote2?.()
+                }}
                 onValidate={() => {
                   setHideUnmatchedRecordsBanner(true)
                   setHasUpdatedQuoteProposal2Notification(true)

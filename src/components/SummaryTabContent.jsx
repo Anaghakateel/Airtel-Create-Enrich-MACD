@@ -32,12 +32,15 @@ export function buildSummaryRows(locations, useFeasibilityResults = false) {
     const product = PRODUCTS[i % PRODUCTS.length]
     const oneTime = 10000 + Math.floor(Math.random() * 150000)
     const arcTotal = 135300 + Math.floor(Math.random() * 50000)
-    const feasibilityStatus = useFeasibilityResults
-      ? FEASIBILITY_RESULT_STATUSES[Math.floor(Math.random() * FEASIBILITY_RESULT_STATUSES.length)]
-      : (() => {
-          const isFailure = Math.random() < 0.2
-          return isFailure ? 'Failure' : FEASIBILITY_STATUSES[Math.floor(Math.random() * 2)]
-        })()
+    const explicitFeasibilityStatus = String(loc?.feasibilityStatus || '').trim()
+    const feasibilityStatus = explicitFeasibilityStatus
+      ? explicitFeasibilityStatus
+      : (useFeasibilityResults
+        ? FEASIBILITY_RESULT_STATUSES[Math.floor(Math.random() * FEASIBILITY_RESULT_STATUSES.length)]
+        : (() => {
+            const isFailure = Math.random() < 0.2
+            return isFailure ? 'Failure' : FEASIBILITY_STATUSES[Math.floor(Math.random() * 2)]
+          })())
     const showInternetConfigError = product === 'Internet' && internetConfigErrorCount < MAX_INTERNET_CONFIG_ERRORS
     if (showInternetConfigError) internetConfigErrorCount += 1
     const row = {
@@ -100,6 +103,8 @@ function FeasibilityBadge({ status }) {
     Success: 'bg-green-600 text-white font-bold rounded-full',
     Partial: 'bg-orange-600 text-black font-bold rounded-full',
     Failure: 'bg-red-600 text-white font-bold rounded-full',
+    Feasible: 'bg-green-600 text-white font-bold rounded-full',
+    'Not Feasible': 'bg-red-600 text-white font-bold rounded-full',
   }
   const baseClass = 'inline-flex items-center justify-center px-3 py-0.5 text-xs min-w-[4.5rem]'
   return (
@@ -688,11 +693,9 @@ function SummaryTabContent({ locations = [], onTotalsChange, onEditRow, showFeas
                   <td className="px-2 py-3 text-gray-800 align-middle truncate">{formatINR(row.arcTotal)}</td>
                   {!embedMode && (
                     <td className="px-2 py-3 align-middle">
-                      {showFeasibilityResults ? (
-                        <FeasibilityBadge status={row.feasibilityStatus} />
-                      ) : (
-                        <span className="text-gray-400">—</span>
-                      )}
+                      {String(row.feasibilityStatus || '').trim()
+                        ? <FeasibilityBadge status={row.feasibilityStatus} />
+                        : <span className="text-gray-400">—</span>}
                     </td>
                   )}
                   <td className="px-2 py-3 text-gray-500 align-middle truncate">{row.crossConnect}</td>

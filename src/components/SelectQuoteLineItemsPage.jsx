@@ -30,16 +30,20 @@ function buildLineItemsFromQuote1(locations) {
   const bandwidths = ['10 Mbps', '100 Mbps', '1 Gbps']
   return locations.map((loc, i) => {
     const g = Math.floor(i / 3) + 1
+    const resolvedAddress = loc.streetAddress || loc.address || loc.premise || loc.location || loc.city || '—'
+    const resolvedProduct = loc.productName || loc.matchedProduct || products[i % products.length]
+    const resolvedMedia = loc.media || loc.feasibleMedia || medias[i % medias.length]
+    const resolvedBandwidth = loc.bandwidth || bandwidths[i % bandwidths.length]
     return {
       id: loc.id ?? `line-${i + 1}`,
       lastEnrichedDate: '01/15/2025',
       lsi: `80260000478${String(g).padStart(2, '0')}...`,
       lineNumber: i + 1,
-      address: loc.streetAddress || loc.city || '—',
+      address: resolvedAddress,
       state: loc.state || '—',
-      productName: products[i % products.length],
-      media: medias[i % medias.length],
-      bandwidth: bandwidths[i % bandwidths.length],
+      productName: resolvedProduct,
+      media: resolvedMedia,
+      bandwidth: resolvedBandwidth,
       quantity: 1,
       billingContactPerson: BILLING_CONTACT_NAMES[i % BILLING_CONTACT_NAMES.length],
       gstApplicable: 'Billing GST',
@@ -256,7 +260,28 @@ function getTechnicalAttributesOverridesFromIntent(intentText) {
 
 export { getTechnicalAttributesOverridesFromIntent }
 
-export default function SelectQuoteLineItemsPage({ onBack, quote1Locations = [], onTechnicalAttributesClick, enrichQuoteUpdateIntent, technicalAttributesConfiguredLocationIds }) {
+export default function SelectQuoteLineItemsPage({
+  onBack,
+  quote1Locations = [],
+  onTechnicalAttributesClick,
+  enrichQuoteUpdateIntent,
+  technicalAttributesConfiguredLocationIds,
+  embeddedMode = false,
+  initialVisibleColumnKeys,
+  onUpdateQuoteClick,
+  updateQuoteEnabled = true,
+}) {
+  const baseColumnKeys = useMemo(() => COLUMNS.map((c) => c.key), [])
+  const allowedInitialVisibleKeys = useMemo(
+    () => new Set([...COLUMN_FILTER_KEYS, ...baseColumnKeys]),
+    [baseColumnKeys]
+  )
+  const resolvedInitialVisibleColumns = useMemo(() => {
+    if (Array.isArray(initialVisibleColumnKeys) && initialVisibleColumnKeys.length > 0) {
+      return new Set(initialVisibleColumnKeys.filter((k) => allowedInitialVisibleKeys.has(k)))
+    }
+    return new Set(COLUMN_FILTER_KEYS)
+  }, [initialVisibleColumnKeys, allowedInitialVisibleKeys])
   const [selectedIds, setSelectedIds] = useState(() => new Set())
   const [viewingSelectedOnly, setViewingSelectedOnly] = useState(false)
   const [deletedIds, setDeletedIds] = useState(() => new Set())
@@ -270,7 +295,7 @@ export default function SelectQuoteLineItemsPage({ onBack, quote1Locations = [],
   const [filterProduct, setFilterProduct] = useState(FILTER_ALL)
   const [filterTechnicalAttributes, setFilterTechnicalAttributes] = useState(FILTER_ALL)
   const [filterByOpen, setFilterByOpen] = useState(false)
-  const [visibleColumnKeys, setVisibleColumnKeys] = useState(() => new Set(COLUMN_FILTER_KEYS))
+  const [visibleColumnKeys, setVisibleColumnKeys] = useState(() => new Set(resolvedInitialVisibleColumns))
   const [columnFilterOpen, setColumnFilterOpen] = useState(false)
   const filterByRef = useRef(null)
   const columnFilterAnchorRef = useRef(null)
@@ -403,16 +428,32 @@ export default function SelectQuoteLineItemsPage({ onBack, quote1Locations = [],
     return getInvoiceShippingAddressDisplay(row)
   }
 
-  const showColumn = (key) => ALWAYS_VISIBLE_COLUMN_KEYS.includes(key) || visibleColumnKeys.size === 0 || visibleColumnKeys.has(key)
+  useEffect(() => {
+    setVisibleColumnKeys(new Set(resolvedInitialVisibleColumns))
+  }, [resolvedInitialVisibleColumns])
+
+  const alwaysVisibleColumnKeys = embeddedMode ? [] : ALWAYS_VISIBLE_COLUMN_KEYS
+  const getColumnLabel = (key, label) => {
+    if (!embeddedMode) return label
+    if (key === 'address') return 'Location'
+    if (key === 'productName') return 'Product'
+    return label
+  }
+  const showColumn = (key) => alwaysVisibleColumnKeys.includes(key) || visibleColumnKeys.size === 0 || visibleColumnKeys.has(key)
 
   // Auto-expand Billing Details and PO Group when explicitly selected in Displaying dropdown (not when "All" is selected)
   useEffect(() => {
+    if (embeddedMode) {
+      setBillingDetailsExpanded(false)
+      setPoDetailsExpanded(false)
+      return
+    }
     const isFiltered = visibleColumnKeys.size > 0 && visibleColumnKeys.size < COLUMN_FILTER_KEYS.length
     if (isFiltered) {
       setBillingDetailsExpanded(visibleColumnKeys.has('billingDetails'))
       setPoDetailsExpanded(visibleColumnKeys.has('poGroup'))
     }
-  }, [visibleColumnKeys])
+  }, [visibleColumnKeys, embeddedMode])
 
   const allLineItems = useMemo(
     () =>
@@ -850,20 +891,22 @@ export default function SelectQuoteLineItemsPage({ onBack, quote1Locations = [],
     <div className="flex flex-col min-h-0 flex-1">
       {/* Header: Breadcrumbs Quote > Enrich Quote */}
       <div className="bg-screenshot-grey border border-gray-200 rounded-lg shadow-sm overflow-hidden mb-4">
-        <div className="px-5 py-4 border-b border-gray-200">
-          <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 text-xs mb-2">
-            <button
-              type="button"
-              onClick={onBack}
-              className="text-airtel-red font-medium hover:underline"
-            >
-              Quote
-            </button>
-            <span className="text-gray-400" aria-hidden="true">&gt;</span>
-            <span className="text-gray-700 font-medium">Enrich Quote</span>
-          </nav>
-          <h2 className="text-base font-semibold text-gray-900">Enrich Quote</h2>
-        </div>
+        {!embeddedMode && (
+          <div className="px-5 py-4 border-b border-gray-200">
+            <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 text-xs mb-2">
+              <button
+                type="button"
+                onClick={onBack}
+                className="text-airtel-red font-medium hover:underline"
+              >
+                Quote
+              </button>
+              <span className="text-gray-400" aria-hidden="true">&gt;</span>
+              <span className="text-gray-700 font-medium">Enrich Quote</span>
+            </nav>
+            <h2 className="text-base font-semibold text-gray-900">Enrich Quote</h2>
+          </div>
+        )}
 
         {/* Filter by (single popover), Search this list (search on right) */}
         <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-3 bg-white border-t border-gray-100">
@@ -1085,7 +1128,7 @@ export default function SelectQuoteLineItemsPage({ onBack, quote1Locations = [],
                 {COLUMNS.filter((col) => showColumn(col.key)).map((col) => (
                   <th key={col.key} rowSpan={2} className="text-left font-medium text-gray-700 py-1 px-2 border-b border-r border-gray-200 whitespace-nowrap align-top group relative" style={getColStyle(col.key)}>
                     <span className="inline-flex items-center gap-0.5">
-                      {col.label}
+                      {getColumnLabel(col.key, col.label)}
                       <svg className="w-3.5 h-3.5 text-gray-400" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
                         <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
                       </svg>
@@ -1626,13 +1669,21 @@ export default function SelectQuoteLineItemsPage({ onBack, quote1Locations = [],
         </div>
       </div>
 
-      {/* Update Parameter */}
+      {/* Update action */}
       <div className="flex justify-end mt-4 flex-shrink-0">
         <button
           type="button"
-          className="px-4 py-2 rounded-md text-xs font-medium bg-airtel-red text-white hover:opacity-90"
+          onClick={embeddedMode ? onUpdateQuoteClick : undefined}
+          disabled={embeddedMode ? !updateQuoteEnabled : false}
+          className={`px-4 py-2 rounded-md text-xs font-medium ${
+            embeddedMode
+              ? (updateQuoteEnabled
+                  ? 'bg-airtel-red text-white hover:opacity-90'
+                  : 'bg-airtel-red/60 text-white cursor-not-allowed')
+              : 'bg-airtel-red text-white hover:opacity-90'
+          }`}
         >
-          Update Parameter
+          {embeddedMode ? 'Update Opportunity & Quote' : 'Update Parameter'}
         </button>
       </div>
 
