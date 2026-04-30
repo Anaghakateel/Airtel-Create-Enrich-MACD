@@ -140,7 +140,6 @@ function App() {
   const [showMatchAllOverlay, setShowMatchAllOverlay] = useState(false)
   const [showValidateOverlay, setShowValidateOverlay] = useState(false)
   const [showContinueValidOverlay, setShowContinueValidOverlay] = useState(false)
-  const [quote2AddressValidated, setQuote2AddressValidated] = useState(false)
   const [showContinueSummaryOverlay, setShowContinueSummaryOverlay] = useState(false)
   const [attributesViewLoadingInProgress, setAttributesViewLoadingInProgress] = useState(false)
   const [showMatchedProductsOverlay, setShowMatchedProductsOverlay] = useState(false)
@@ -183,17 +182,6 @@ function App() {
   }, [quote1Locations])
 
   const activeNavTab = currentPage
-  const isCreateQuote2Flow = selectedQuote === 'Quote 1 (2)' && activeTab === 'Extracted Information'
-
-  useEffect(() => {
-    if (selectedQuote !== 'Quote 1 (2)') return
-    setQuote2AddressValidated(false)
-    setValidationComplete(false)
-    setValidatedRecordCount(0)
-    setValidatedRecordIds(new Set())
-    setValidationByRowId(null)
-    setValidationResult(null)
-  }, [selectedQuote])
 
   useEffect(() => {
     if (activeTab !== 'Summary') setSummaryFeasibilityEmptyInitially(false)
@@ -850,7 +838,7 @@ function App() {
                 externalLocationMatchStartSignal={feasibilityLocationMatchStartSignal}
                 externalLocationMatchNavigateSignal={feasibilityLocationMatchNavigateSignal}
               />
-            ) : (selectedQuote === 'Quote 1' || selectedQuote === 'Quote 1 (2)' || selectedQuote === 'MACD Quote' || selectedQuote === 'SBI Bank Quote' || selectedQuote === 'HDFC Bank Quote') ? (
+            ) : (selectedQuote === 'Quote 1' || selectedQuote === 'MACD Quote' || selectedQuote === 'SBI Bank Quote' || selectedQuote === 'HDFC Bank Quote') ? (
             <div className="relative flex flex-col flex-1 min-h-0">
             {validateQuoteComplete && !validateQuoteSuccessBannerDismissed && (
               <div className="absolute top-0 left-1/2 -translate-x-1/2 z-10 flex items-center justify-center" role="status">
@@ -1085,7 +1073,6 @@ function App() {
               ) : (
                 <DataTableSection
                   isMacdQuote={selectedQuote === 'MACD Quote'}
-                  isCreateQuote2Flow={isCreateQuote2Flow}
                   continuedRecordIds={continuedRecordIds}
                   validationByRowId={validationByRowId}
                   validationResult={validationResult}
@@ -1125,12 +1112,6 @@ function App() {
             </div>
             {activeTab === 'Extracted Information' && !extractionInProgress && (
               <FooterActions
-                showValidateAddressButton={isCreateQuote2Flow}
-                isAddressValidated={!isCreateQuote2Flow || quote2AddressValidated}
-                onValidateAddress={() => {
-                  setQuote2AddressValidated(true)
-                  quoteActionsRef.current?.validateAddressesForQuote2?.()
-                }}
                 onValidate={() => {
                   setHideUnmatchedRecordsBanner(true)
                   setHasUpdatedQuoteProposal2Notification(true)

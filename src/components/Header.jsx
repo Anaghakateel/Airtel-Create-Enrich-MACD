@@ -160,7 +160,7 @@ function Header({ activeNavTab = 'Quote', onNavClick, selectedQuote = 'Quote 1',
             ? conversationSnapshot
             : stored?.snapshot && typeof stored.snapshot.isConversationView === 'boolean' && Array.isArray(stored.snapshot.messages)
               ? stored.snapshot
-              : selectedQuote === 'Quote 1' || selectedQuote === 'Quote 1 (2)' || selectedQuote === 'MACD Quote' || (selectedQuote === 'Quote 2' && quote2ProgressStage === 'Draft')
+              : selectedQuote === 'Quote 1' || selectedQuote === 'MACD Quote' || (selectedQuote === 'Quote 2' && quote2ProgressStage === 'Draft')
                 ? DEFAULT_QUOTE1_PANEL_SNAPSHOT
                 : null)
         : enrichQuoteFlowActive && enrichQuoteStored?.messages?.length
@@ -785,13 +785,6 @@ function Header({ activeNavTab = 'Quote', onNavClick, selectedQuote = 'Quote 1',
                         className={`w-full text-left px-4 py-2 text-xs font-medium whitespace-nowrap ${selectedQuote === 'Quote 1' ? 'text-airtel-red bg-red-50' : 'text-gray-700 hover:bg-grey-bg'}`}
                       >
                         Create Quote
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => { onQuoteSelect?.('Quote 1 (2)'); setQuoteDropdownOpen(false); onNavClick?.('Quote') }}
-                        className={`w-full text-left px-4 py-2 text-xs font-medium whitespace-nowrap ${selectedQuote === 'Quote 1 (2)' ? 'text-airtel-red bg-red-50' : 'text-gray-700 hover:bg-grey-bg'}`}
-                      >
-                        Create Quote (2)
                       </button>
                       <button
                         type="button"
